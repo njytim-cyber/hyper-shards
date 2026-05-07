@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(python -m http.server 8000 --bind 127.0.0.1 --directory \"c:\\\\Users\\\\Admin\\\\Desktop\\\\Antigravity\\\\Code-Folders\\\\hyper-shards-2\")",
+      "PowerShell(Start-Sleep -Milliseconds 800; try { \\(Invoke-WebRequest -Uri 'http://127.0.0.1:8000/' -UseBasicParsing -TimeoutSec 2\\).StatusCode } catch { $_.Exception.Message })",
+      "PowerShell(Start-Sleep -Milliseconds 700; try { \\(Invoke-WebRequest -Uri 'http://127.0.0.1:8000/' -UseBasicParsing -TimeoutSec 2\\).StatusCode } catch { $_.Exception.Message })",
+      "PowerShell(npm install -g firebase-tools 2>&1)",
+      "PowerShell(& \"C:\\\\Program Files\\\\nodejs\\\\npm.cmd\" install -g firebase-tools 2>&1)"
+    ]
+  }
+}
