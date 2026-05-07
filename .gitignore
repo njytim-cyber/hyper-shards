@@ -2,3 +2,4 @@
 .firebase/
 *.log
 .DS_Store
+audio/original/

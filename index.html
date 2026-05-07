@@ -1996,7 +1996,10 @@ function beginRound(r){
     state.travelGoal = Infinity;
     spawnBoss(r);
     toast('⚠ BOSS WAVE');
-    if(typeof setMusicMode==='function') setMusicMode('boss');
+    if(typeof setMusicMode==='function'){
+      const tier = state.boss && state.boss.tier;
+      setMusicMode(tier===5 ? 'final-boss' : 'boss');
+    }
   } else {
     document.getElementById('bossBar').style.display='none';
     state.boss = null;
@@ -2289,119 +2292,121 @@ let audioCtx;
 function ac(){ try{ if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} return audioCtx; }
 
 // ============================================================
-// BACKGROUND MUSIC — procedural ambient track via WebAudio
+// BACKGROUND MUSIC — looping <audio> tracks with crossfade
 // ============================================================
-const music = { started:false, ctx:null, master:null, padFilter:null, t:0, scheduler:null, mode:'menu' };
-const NOTE = {
-  c2:65.41, eb2:77.78, f2:87.31, g2:98.00, ab2:103.83, bb2:116.54,
-  c3:130.81, eb3:155.56, f3:174.61, g3:196.00, ab3:207.65, bb3:233.08,
-  c4:261.63, eb4:311.13, f4:349.23, g4:392.00, ab4:415.30,
-  c5:523.25, eb5:622.25, f5:698.46, g5:783.99, ab5:830.61,
-};
-// Cm pentatonic 16-step patterns
-const PATTERNS = {
-  menu: {
-    bass: ['c2',null,null,null,'g2',null,null,null,'ab2',null,null,null,'bb2',null,null,null],
-    lead: ['c5',null,'eb5',null,'g5',null,'eb5',null, 'ab4','g4','f4',null,'g4',null,'eb4',null],
-    pad: 'c3'
-  },
-  play: {
-    bass: ['c2','c2',null,'c2','g2',null,'g2',null,'ab2','ab2',null,'ab2','bb2','bb2',null,null],
-    lead: ['c5',null,'g5',null,'eb5','g5',null,'c5','ab4',null,'eb4',null,'g4','bb4',null,'g4'],
-    pad: 'c3'
-  },
-  boss: {
-    bass: ['c2','c2','c2','eb2','g2','g2','ab2','bb2','c2','c2','eb2','f2','g2','ab2','bb2','c3'],
-    lead: ['c5','eb5','g5','c5','eb5','g5','ab5','g5','c5','eb5','g5','f5','g5','eb5','c5','bb4'],
-    pad: 'c3'
-  }
+// Track files live in /audio. Loops are gapless via 'ended' relisten.
+// 'menu' and 'play' eager-load on first interaction; the heavier
+// boss/enrage/final/victory/gameover tracks lazy-load on demand so
+// the initial page weight stays small.
+const MUSIC_TRACKS = {
+  menu:       { src:'audio/01_The_Slow_Descent.mp3',          loop:true,  vol:0.55, eager:true  },
+  play:       { src:'audio/02_Glass_Horizon.mp3',             loop:true,  vol:0.55, eager:true  },
+  boss:       { src:'audio/03_Remnants_of_a_Fallen_Star.mp3', loop:true,  vol:0.60, eager:false },
+  'boss-enrage':{src:'audio/04_Gravity_Well_Ascent.mp3',      loop:true,  vol:0.65, eager:false },
+  'final-boss':{src:'audio/05_The_Last_Warden.mp3',           loop:true,  vol:0.65, eager:false },
+  victory:    { src:'audio/06_Beyond_The_High_Score.mp3',     loop:false, vol:0.70, eager:false },
+  gameover:   { src:'audio/07_Where_the_Sound_Ends.mp3',      loop:true,  vol:0.50, eager:false },
 };
 
-function tone(freq, start, dur, type='triangle', vol=0.08, attack=0.01){
-  const a = music.ctx; if(!a || !music.master) return;
-  const o = a.createOscillator();
-  const g = a.createGain();
-  o.type = type;
-  o.frequency.value = freq;
-  o.connect(g); g.connect(music.master);
-  g.gain.setValueAtTime(0, start);
-  g.gain.linearRampToValueAtTime(vol, start+attack);
-  g.gain.exponentialRampToValueAtTime(0.001, start+dur);
-  o.start(start); o.stop(start+dur+0.05);
+const music = {
+  mode: 'menu',          // last requested mode
+  current: null,         // currently audible Audio element
+  elements: {},          // mode -> Audio
+  enabled: true,         // mirrors save.music
+  fadeMs: 700,
+  _fadeTimers: new WeakMap(),
+};
+
+function _ensureTrack(mode){
+  const def = MUSIC_TRACKS[mode]; if(!def) return null;
+  let el = music.elements[mode];
+  if(!el){
+    el = new Audio(def.src);
+    el.loop = def.loop;
+    el.preload = def.eager ? 'auto' : 'none';
+    el.volume = 0;
+    // Defensive: some mobile browsers don't honour loop reliably.
+    if(def.loop){
+      el.addEventListener('ended', ()=>{ try{ el.currentTime = 0; el.play(); }catch(e){} });
+    }
+    music.elements[mode] = el;
+  }
+  return el;
+}
+
+function _fadeTo(el, target, ms){
+  if(!el) return;
+  const prev = music._fadeTimers.get(el);
+  if(prev) clearInterval(prev);
+  const start = el.volume;
+  const t0 = performance.now();
+  const tick = setInterval(()=>{
+    const p = Math.min(1, (performance.now()-t0)/ms);
+    el.volume = start + (target-start)*p;
+    if(p>=1){
+      clearInterval(tick);
+      music._fadeTimers.delete(el);
+      if(target===0){ try{ el.pause(); }catch(e){} }
+    }
+  }, 20);
+  music._fadeTimers.set(el, tick);
 }
 
 function startMusic(){
-  if(music.started) return;
-  const a = ac(); if(!a) return;
-  if(a.state==='suspended'){ try{ a.resume(); }catch(e){} }
-  music.ctx = a;
-  music.started = true;
-  music.master = a.createGain();
-  music.master.gain.value = save.music ? 0.07 : 0;
-  music.master.connect(a.destination);
-
-  // Pad drone (sawtooth + lowpass + slow LFO)
-  const pad = a.createOscillator();
-  pad.type = 'sawtooth';
-  pad.frequency.value = NOTE.c2;
-  const padFilter = a.createBiquadFilter();
-  padFilter.type = 'lowpass';
-  padFilter.frequency.value = 500;
-  padFilter.Q.value = 2;
-  const padGain = a.createGain();
-  padGain.gain.value = 0.45;
-  pad.connect(padFilter); padFilter.connect(padGain); padGain.connect(music.master);
-  pad.start();
-  music.padFilter = padFilter;
-
-  // LFO sweep
-  const lfo = a.createOscillator();
-  lfo.frequency.value = 0.12;
-  const lfoGain = a.createGain();
-  lfoGain.gain.value = 350;
-  lfo.connect(lfoGain); lfoGain.connect(padFilter.frequency);
-  lfo.start();
-
-  // Note scheduler (look-ahead)
-  let nextStep = a.currentTime + 0.1;
-  const stepDur = 0.26;
-  music.t = 0;
-  music.scheduler = setInterval(()=>{
-    if(!music.ctx) return;
-    while(nextStep < music.ctx.currentTime + 0.25){
-      const pat = PATTERNS[music.mode] || PATTERNS.menu;
-      const step = music.t % 16;
-      const b = pat.bass[step];
-      if(b) tone(NOTE[b], nextStep, stepDur*1.4, 'triangle', 0.10);
-      const l = pat.lead[step];
-      if(l) tone(NOTE[l], nextStep, stepDur*0.85, 'sine', 0.05);
-      // soft kick on every 4th step in play/boss modes
-      if(music.mode!=='menu' && step%4===0){
-        const kick = music.ctx.createOscillator();
-        const kg = music.ctx.createGain();
-        kick.type = 'sine'; kick.frequency.setValueAtTime(120, nextStep);
-        kick.frequency.exponentialRampToValueAtTime(40, nextStep+0.1);
-        kg.gain.setValueAtTime(0.1, nextStep);
-        kg.gain.exponentialRampToValueAtTime(0.001, nextStep+0.12);
-        kick.connect(kg); kg.connect(music.master);
-        kick.start(nextStep); kick.stop(nextStep+0.13);
-      }
-      music.t++;
-      nextStep += stepDur;
-    }
-  }, 60);
+  // Eager-load the lightweight tracks so first transitions are instant.
+  for(const m in MUSIC_TRACKS){
+    if(MUSIC_TRACKS[m].eager) _ensureTrack(m);
+  }
+  setMusicMode(music.mode);
 }
 
 function setMusicMode(mode){
-  music.mode = mode || 'menu';
-  if(music.padFilter && music.ctx){
-    const target = mode==='boss' ? 900 : mode==='play' ? 700 : 500;
-    music.padFilter.frequency.setTargetAtTime(target, music.ctx.currentTime, 0.5);
+  mode = mode || 'menu';
+  music.mode = mode;
+  const next = _ensureTrack(mode);
+  if(!next) return;
+  const prev = music.current;
+  if(prev === next){
+    if(music.enabled && next.paused){ try{ next.play(); }catch(e){} }
+    return;
+  }
+  const def = MUSIC_TRACKS[mode];
+  const targetVol = music.enabled ? def.vol : 0;
+  if(prev) _fadeTo(prev, 0, music.fadeMs);
+  music.current = next;
+  if(music.enabled){
+    try{
+      next.currentTime = 0;
+      const p = next.play();
+      if(p && p.catch) p.catch(()=>{}); // autoplay block; will retry on next interaction
+    }catch(e){}
+    _fadeTo(next, targetVol, music.fadeMs);
+  } else {
+    next.volume = 0;
   }
 }
+
+// Fire-and-forget one-shot stinger (e.g. victory). Doesn't replace current bed.
+function playMusicSting(mode){
+  const el = _ensureTrack(mode); if(!el || !music.enabled) return;
+  try{
+    el.currentTime = 0;
+    el.volume = MUSIC_TRACKS[mode].vol;
+    const p = el.play();
+    if(p && p.catch) p.catch(()=>{});
+  }catch(e){}
+}
+
 function setMusicVolume(on){
-  if(!music.master || !music.ctx) return;
-  music.master.gain.setTargetAtTime(on?0.07:0, music.ctx.currentTime, 0.2);
+  music.enabled = !!on;
+  const cur = music.current;
+  if(!cur) return;
+  if(on){
+    try{ if(cur.paused) cur.play(); }catch(e){}
+    _fadeTo(cur, MUSIC_TRACKS[music.mode].vol, 300);
+  } else {
+    _fadeTo(cur, 0, 300);
+  }
 }
 
 // Boot music on first user interaction (browsers block autoplay)
@@ -2746,6 +2751,7 @@ function update(dt){
         state.score += 500 + b.tier*200;
         state.boss = null;
         document.getElementById('bossBar').style.display='none';
+        if(typeof playMusicSting==='function') playMusicSting('victory');
         endRound(); return;
       }
     }
@@ -3124,6 +3130,7 @@ function damagePlayer(dmg){
     explode(player.x,player.y,player.skin.glow||'#fff',80,2);
     if(state.mode==='survival'){
       state.phase='dead';
+      if(typeof setMusicMode==='function') setMusicMode('gameover');
       setTimeout(()=>{
         const title = state.bossArenaMode ? 'DEFEATED' : 'GAME OVER';
         document.querySelector('#menuOver h1').textContent = title;
@@ -3172,6 +3179,7 @@ function updateBoss(dt){
   }
   if(!b.rage && b.hp < b.maxHp*0.4){
     b.rage = true; toast('⚠ '+b.name+' ENRAGED'); state.shake = 22;
+    if(typeof setMusicMode==='function' && b.tier!==5) setMusicMode('boss-enrage');
     for(let i=0;i<4;i++){ const u = spawnUFO(state.round); u.maxHp = u.hp; state.enemies.push(u); }
     for(let i=0;i<24;i++){
       const a = i/24*Math.PI*2;
@@ -5661,6 +5669,7 @@ function startBossFight(tier){
   spawnBoss(tier*5);
   document.getElementById('roundTxt').textContent = 'BOSS · '+state.boss.name;
   toast('⚠ '+state.boss.name);
+  if(typeof setMusicMode==='function') setMusicMode(tier===5 ? 'final-boss' : 'boss');
 }
 
 function renderBossList(){
