@@ -691,6 +691,13 @@ function damagePlayer(dmg){
       state.phase='dead';
       haptic([100,60,140]);
       if(typeof setMusicMode==='function') setMusicMode('gameover');
+      // Submit to leaderboard. Fire-and-forget — the helper swallows
+      // network errors so an offline / no-DB state never disrupts the
+      // game-over screen flow. Skip in boss-arena mode where the
+      // "death" is just a tier retry, not a scored run.
+      if(!state.bossArenaMode && state.score > 0 && typeof submitScore==='function'){
+        submitScore({ score: state.score, round: state.round });
+      }
       setTimeout(()=>{
         const title = state.bossArenaMode ? 'DEFEATED' : 'GAME OVER';
         document.querySelector('#menuOver h1').textContent = title;

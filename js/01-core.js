@@ -128,6 +128,37 @@ function safeLSSet(key, val){
 }
 
 // ============================================================
+// LEADERBOARD CLIENT
+// ============================================================
+// Fire-and-forget POST to /api/scores on game-over. The Pages Function
+// owns validation; we just need to handle the no-network / no-DB case
+// gracefully so a leaderboard outage never breaks play. submitScore
+// returns the fetch promise so callers can await if they want, but
+// most callers just call it and move on.
+async function submitScore(opts){
+  try{
+    const r = await fetch('/api/scores', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        name: (save && save.username) || 'PILOT',
+        score: opts.score|0,
+        round: opts.round|0,
+      }),
+    });
+    return r.ok;
+  }catch(e){ return false; }
+}
+async function fetchTopScores(){
+  try{
+    const r = await fetch('/api/scores', {cache:'no-store'});
+    if(!r.ok) return [];
+    const d = await r.json();
+    return Array.isArray(d.scores) ? d.scores : [];
+  }catch(e){ return []; }
+}
+
+// ============================================================
 // HAPTICS
 // ============================================================
 // Light tactile feedback on touch devices. Gated by save.haptics so the

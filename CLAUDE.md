@@ -3,6 +3,27 @@
 A neon-arcade space shooter (HTML5 Canvas, single-page, browser-direct).
 This file is durable context for future Claude sessions.
 
+## Cloud leaderboard (one-time setup)
+
+`/api/scores` is a Cloudflare Pages Function (`functions/api/scores.js`)
+backed by D1. To activate it on the live site:
+
+```sh
+# 1. Create the database
+wrangler d1 create hyper-shards-leaderboard
+
+# 2. Apply schema (table + index)
+wrangler d1 execute hyper-shards-leaderboard --file functions/api/_schema.sql
+
+# 3. Bind it to the Pages project as `DB`:
+#    Cloudflare Pages → Settings → Functions → D1 database bindings
+#    Variable name: DB   Database: hyper-shards-leaderboard
+```
+
+Until the binding exists the API returns empty results / 503 — the
+client (`fetchTopScores`, `submitScore` in `01-core.js`) silently
+degrades, so play continues normally without a leaderboard.
+
 ## Stack
 
 **Pure JavaScript. No TypeScript, no bundler, no build step.**

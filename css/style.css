@@ -911,6 +911,26 @@
   #hubModalBox .stat{padding:10px 12px; background:#050a18cc; border:2px solid #244a78; border-radius:10px; text-align:center;}
   #hubModalBox .stat .num{color:#ffea00; font-weight:900; font-size:24px; text-shadow:0 2px 0 #050a18;}
   #hubModalBox .stat .lbl{color:#9ec5ff; font-size:10px; letter-spacing:2px; margin-top:2px;}
+  /* Top-Pilots leaderboard rendered inside the STATS modal. Compact
+     four-column row: rank · name · score · round. Highlight the
+     current pilot if they appear near the top. */
+  #hubModalBox .lbBoard{
+    display:flex; flex-direction:column; gap:4px; margin-top:6px;
+    max-height:260px; overflow-y:auto;
+    scrollbar-width:thin; scrollbar-color:#3a8acc #0a1430;
+  }
+  #hubModalBox .lbLoad{padding:14px; text-align:center; color:#7ea8d4; font-size:12px; letter-spacing:2px;}
+  #hubModalBox .lbRow{
+    display:grid; grid-template-columns:36px 1fr auto auto; gap:8px;
+    align-items:center; padding:6px 10px;
+    background:#050a18cc; border:2px solid #244a78; border-radius:8px;
+    font-family:inherit; font-weight:900; letter-spacing:1px;
+  }
+  #hubModalBox .lbRow .r{color:#7ea8d4; font-size:12px; text-align:right;}
+  #hubModalBox .lbRow .n{color:#cfe9ff; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  #hubModalBox .lbRow .v{color:#ffea00; font-size:14px; text-shadow:0 1px 0 #050a18;}
+  #hubModalBox .lbRow .rd{color:#9ec5ff; font-size:11px;}
+  #hubModalBox .lbRow.me{border-color:#ffea00; background:#1a3a6acc; box-shadow:0 0 14px #ffea0033;}
   #hubModalBox .modalBtn{display:block; width:100%; margin-top:10px; padding:10px; background:linear-gradient(180deg,#ff3344,#aa1122); border:3px solid #050a18; color:#fff; font-family:inherit; font-weight:900; letter-spacing:3px; border-radius:10px; cursor:pointer; box-shadow:0 4px 0 #050a18;}
   #hubModalBox .modalBtn:hover{filter:brightness(1.2);}
   #hubModalBox .modalBtn.primary{background:linear-gradient(180deg,#00d977,#00875a);}

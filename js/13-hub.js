@@ -515,6 +515,10 @@ document.getElementById('hubBtnAchv').onclick = ()=>{
 };
 
 document.getElementById('hubBtnLeaderboard').onclick = ()=>{
+  // Open immediately with local stats; fetch the global leaderboard
+  // async and slot it in when (if) it arrives. This way the modal
+  // never blocks on network — offline / no-DB shows the local stats
+  // and a "leaderboard unavailable" line.
   openHubModal(`
     <h2><span class="ic">📊</span>STATS</h2>
     <div class="stats">
@@ -529,7 +533,31 @@ document.getElementById('hubBtnLeaderboard').onclick = ()=>{
     <div class="stats">
       ${[1,2,3,4,5].map(t=>`<div class="stat"><div class="num">${(save.bossWins&&save.bossWins[t])||0}</div><div class="lbl">TIER ${t}</div></div>`).join('')}
     </div>
+    <h2 style="margin-top:18px;font-size:18px;">★ TOP PILOTS</h2>
+    <div id="lbBoard" class="lbBoard"><div class="lbLoad">Loading…</div></div>
   `);
+  if(typeof fetchTopScores==='function'){
+    fetchTopScores().then(scores=>{
+      const el = document.getElementById('lbBoard');
+      if(!el) return;
+      if(!scores.length){
+        el.innerHTML = '<div class="lbLoad">Leaderboard offline</div>';
+        return;
+      }
+      // Show top 25 to keep the modal scrollable but useful.
+      const rows = scores.slice(0,25).map((s,i)=>{
+        const rank = i+1;
+        const me = (save.username||'PILOT')===s.name && rank<=3 ? ' me' : '';
+        return `<div class="lbRow${me}">
+          <span class="r">${rank}</span>
+          <span class="n">${String(s.name||'').replace(/[<>&]/g,'')}</span>
+          <span class="v">${s.score|0}</span>
+          <span class="rd">R${s.round|0}</span>
+        </div>`;
+      }).join('');
+      el.innerHTML = rows;
+    });
+  }
 };
 
 document.getElementById('hubBtnDaily').onclick = ()=>{
