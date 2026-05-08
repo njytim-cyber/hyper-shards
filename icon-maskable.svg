@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Maskable: full-bleed background with the ship inside the safe zone (centre 80%). -->
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="40%" r="70%">
+      <stop offset="0%" stop-color="#0a1430"/>
+      <stop offset="100%" stop-color="#000"/>
+    </radialGradient>
+    <linearGradient id="ship" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#66f7ff"/>
+      <stop offset="100%" stop-color="#1a4a7a"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <!-- inset to safe zone (~20% margin) so platform launchers can crop -->
+  <g transform="translate(102 102) scale(0.6)">
+    <path d="M256 110 L320 280 L300 320 L256 290 L212 320 L192 280 Z" fill="url(#ship)" stroke="#ffffff" stroke-width="6" stroke-linejoin="round"/>
+    <ellipse cx="256" cy="200" rx="22" ry="32" fill="#ffea00" stroke="#050a18" stroke-width="4"/>
+  </g>
+</svg>

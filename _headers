@@ -19,6 +19,15 @@
 /audio/*
   Cache-Control: public, max-age=31536000, immutable
 
+# Service worker: never cache the SW itself longer than a few minutes,
+# otherwise stale SW logic can pin players to an old shell across
+# deploys. The browser also enforces this in spec but belt+braces.
+/sw.js
+  Cache-Control: public, max-age=0, must-revalidate
+
+/manifest.webmanifest
+  Cache-Control: public, max-age=300
+
 # Light security hardening. The game is a single static page with no
 # user-generated content, no third-party iframes, no server side, so
 # these are conservative defaults.

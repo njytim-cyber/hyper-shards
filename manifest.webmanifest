@@ -1,0 +1,26 @@
+{
+  "name": "Hyper Shards",
+  "short_name": "Hyper Shards",
+  "description": "Neon-arcade space shooter. Survive infinite rounds, slay bosses every 5th wave.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#02030a",
+  "theme_color": "#02030a",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "categories": ["games", "entertainment"]
+}
