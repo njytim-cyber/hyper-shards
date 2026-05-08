@@ -900,6 +900,13 @@
   #hubModalBox .toggle .swt::after{content:""; position:absolute; left:2px; top:2px; width:16px; height:16px; border-radius:50%; background:#9ec5ff; transition:.2s; box-shadow:0 1px 2px #050a18;}
   #hubModalBox .toggle.on .swt{background:#00d977;}
   #hubModalBox .toggle.on .swt::after{left:24px; background:#fff;}
+  #hubModalBox .bgRow{flex-wrap:wrap; align-items:flex-start;}
+  #hubModalBox .bgPicker{display:flex; flex-wrap:wrap; gap:6px; flex:1; justify-content:flex-end;}
+  #hubModalBox .bgChip{position:relative; width:64px; height:40px; border-radius:8px; border:2px solid #050a18; cursor:pointer; padding:0; overflow:hidden; transition:transform .12s, box-shadow .12s;}
+  #hubModalBox .bgChip span{position:absolute; left:0; right:0; bottom:2px; text-align:center; font-size:8px; letter-spacing:1px; color:#fff; font-weight:900; text-shadow:0 1px 2px #000, 0 0 4px #000; pointer-events:none;}
+  #hubModalBox .bgChip:hover{transform:translateY(-1px);}
+  #hubModalBox .bgChip.sel{border-color:#ffea00; box-shadow:0 0 12px #ffea0099, inset 0 0 14px #00000088;}
+  body.is-phone #hubModalBox .bgChip{width:54px; height:36px;}
   #hubModalBox .achv{display:flex; align-items:center; gap:10px; padding:10px 12px; border:2px solid #244a78; border-radius:10px; margin-bottom:6px; background:#050a1899;}
   #hubModalBox .achv.locked{opacity:.4;}
   #hubModalBox .achv .icon{font-size:22px;}

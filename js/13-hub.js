@@ -2,6 +2,25 @@
 // ============================================================
 // HUB (Bloons-style main menu) — scene + hero + nav
 // ============================================================
+
+// Background theme palettes for the hub menu. Each palette retunes the
+// gradient, nebula colors, platform glow, and accent beam in
+// drawHubScene(). The animated decorations (stars, comets, asteroids,
+// planet, station) stay theme-agnostic so the scene reads consistently.
+// `bg` is a 3-stop top→bottom gradient. `nebs` are the four big radial
+// clouds in scene-paint order. `glowA`/`glowB` tint the platform pulse.
+// `beam` colors the energy beam from the station.
+const HUB_BG_THEMES = {
+  nebula:  { label:'NEBULA',  bg:['#3a1f6e','#1a103a','#02030a'], nebs:['#ff66cc','#3aa0ff','#aa66ff','#ffaa00'], glowA:'#00eaff', glowB:'#ff00cc', beam:'#00eaff' },
+  crimson: { label:'CRIMSON', bg:['#5a1020','#2a0810','#0a0204'], nebs:['#ff3344','#ff8844','#ff66aa','#ffcc66'], glowA:'#ff6644', glowB:'#ffaa00', beam:'#ff6644' },
+  void:    { label:'VOID',    bg:['#0a1430','#050a18','#000004'], nebs:['#1a3a6a','#244a78','#0a2050','#3a8acc'], glowA:'#3a8acc', glowB:'#244a78', beam:'#66aaff' },
+  aurora:  { label:'AURORA',  bg:['#0a4a3a','#053028','#02100a'], nebs:['#00ffaa','#00eaff','#66ffaa','#aaffcc'], glowA:'#00ffaa', glowB:'#00eaff', beam:'#66ffcc' },
+  solar:   { label:'SOLAR',   bg:['#5a3010','#2a1a08','#0a0604'], nebs:['#ffaa00','#ffea00','#ff8844','#ffcc66'], glowA:'#ffea00', glowB:'#ff8844', beam:'#ffea00' },
+};
+function getHubTheme(){
+  return HUB_BG_THEMES[(save && save.hubBg) || 'nebula'] || HUB_BG_THEMES.nebula;
+}
+
 const hubScene = document.getElementById('hubScene');
 const hubSceneCtx = hubScene.getContext('2d');
 const hubHeroCanvas = document.getElementById('hubHeroCanvas');
@@ -65,15 +84,21 @@ function drawHubScene(){
   const g = hubSceneCtx;
   const w = hubScene.width, h = hubScene.height;
   const t = performance.now();
+  const theme = getHubTheme();
   g.clearRect(0,0,w,h);
 
-  // === Deep space gradient (animated hue shift) ===
-  const hueShift = Math.sin(t/8000)*15;
+  // === Deep space gradient (theme palette + slow brightness pulse) ===
+  // The pulse keeps the previous "alive" feeling without coupling to a
+  // hardcoded hue, so all theme presets breathe the same way.
+  const pulse = 1 + Math.sin(t/8000)*0.06;
   const bg = g.createLinearGradient(0,0,0,h);
-  bg.addColorStop(0, `hsl(${260+hueShift}, 70%, 14%)`);
-  bg.addColorStop(0.5, `hsl(${290+hueShift}, 70%, 10%)`);
-  bg.addColorStop(1, '#02030a');
+  bg.addColorStop(0, theme.bg[0]);
+  bg.addColorStop(0.5, theme.bg[1]);
+  bg.addColorStop(1, theme.bg[2]);
   g.fillStyle = bg; g.fillRect(0,0,w,h);
+  g.globalAlpha = Math.max(0, pulse-1);
+  g.fillStyle = theme.nebs[0]; g.fillRect(0,0,w,h);
+  g.globalAlpha = 1;
 
   // === Hyperspace streaks (radial from screen center) ===
   const cx = w/2, cy = h/2;
@@ -99,10 +124,10 @@ function drawHubScene(){
     g.fillStyle = grd;
     g.beginPath(); g.arc(cxn,cyn,r,0,Math.PI*2); g.fill();
   }
-  nebula(w*0.18 + Math.cos(t/4000)*40, h*0.32, Math.max(w,h)*0.5, '#ff66cc');
-  nebula(w*0.78 + Math.sin(t/3500)*40, h*0.45, Math.max(w,h)*0.46, '#3aa0ff');
-  nebula(w*0.5, h*0.22, Math.max(w,h)*0.4, '#aa66ff');
-  nebula(w*0.3 + Math.sin(t/5000)*60, h*0.7, Math.max(w,h)*0.3, '#ffaa00');
+  nebula(w*0.18 + Math.cos(t/4000)*40, h*0.32, Math.max(w,h)*0.5, theme.nebs[0]);
+  nebula(w*0.78 + Math.sin(t/3500)*40, h*0.45, Math.max(w,h)*0.46, theme.nebs[1]);
+  nebula(w*0.5, h*0.22, Math.max(w,h)*0.4, theme.nebs[2]);
+  nebula(w*0.3 + Math.sin(t/5000)*60, h*0.7, Math.max(w,h)*0.3, theme.nebs[3]);
 
   // === Stars (twinkle, colored mix) ===
   for(const s of hubStars){
@@ -258,9 +283,9 @@ function drawHubScene(){
     const bx = w*0.12+50, by = h*0.18;
     const ba = Math.atan2(cy-by, cx-bx);
     const beamLen = Math.min(w,h)*0.6;
-    g.strokeStyle = '#00eaff';
+    g.strokeStyle = theme.beam;
     g.lineWidth = 3 + Math.sin(t/100)*2;
-    g.shadowColor = '#00eaff'; g.shadowBlur = 20;
+    g.shadowColor = theme.beam; g.shadowBlur = 20;
     g.globalAlpha = (Math.sin(t/2000)-0.7)/0.3;
     g.beginPath();
     g.moveTo(bx, by);
@@ -276,15 +301,15 @@ function drawHubScene(){
   grdGround.addColorStop(1, '#0a0520');
   g.fillStyle = grdGround;
   g.fillRect(0, h*0.74, w, h*0.26);
-  // animated platform glow under hero
-  const pulse = 0.5 + 0.5*Math.sin(t/600);
+  // animated platform glow under hero — tinted by theme accent colors
+  const platPulse = 0.5 + 0.5*Math.sin(t/600);
   const cgrd = g.createRadialGradient(w/2, h*0.82, 10, w/2, h*0.82, w*0.45);
-  cgrd.addColorStop(0,`rgba(0,234,255,${0.35+0.25*pulse})`);
-  cgrd.addColorStop(0.5,`rgba(255,0,204,${0.15+0.15*pulse})`);
-  cgrd.addColorStop(1,'#00eaff00');
+  cgrd.addColorStop(0, theme.glowA + Math.round((0.35+0.25*platPulse)*255).toString(16).padStart(2,'0'));
+  cgrd.addColorStop(0.5, theme.glowB + Math.round((0.15+0.15*platPulse)*255).toString(16).padStart(2,'0'));
+  cgrd.addColorStop(1, theme.glowA + '00');
   g.fillStyle = cgrd; g.fillRect(0, h*0.74, w, h*0.26);
   // hexagonal grid lines on platform (perspective)
-  g.strokeStyle = '#00eaff33'; g.lineWidth = 1;
+  g.strokeStyle = theme.glowA + '33'; g.lineWidth = 1;
   for(let i=0;i<8;i++){
     const yy = h*0.78 + i*((h*0.22)/8);
     g.beginPath(); g.moveTo(0, yy); g.lineTo(w, yy); g.stroke();
@@ -449,6 +474,16 @@ document.getElementById('hubBtnSettings').onclick = ()=>{
       <span class="label">HAPTICS</span>
       <div class="toggle ${save.haptics?'on':''}" id="optHaptics"><div class="swt"></div><span>${save.haptics?'ON':'OFF'}</span></div>
     </div>
+    <div class="row bgRow">
+      <span class="label">MENU BACKGROUND</span>
+      <div class="bgPicker" id="optHubBg">
+        ${Object.entries(HUB_BG_THEMES).map(([id,th])=>{
+          const sel = ((save.hubBg||'nebula')===id) ? ' sel' : '';
+          const grad = `linear-gradient(180deg, ${th.bg[0]}, ${th.bg[1]}, ${th.bg[2]})`;
+          return `<button type="button" class="bgChip${sel}" data-bg="${id}" aria-label="${th.label}" style="background:${grad}; box-shadow: inset 0 0 14px ${th.glowA}66;"><span>${th.label}</span></button>`;
+        }).join('')}
+      </div>
+    </div>
     <div class="row">
       <span class="label">CREDITS</span>
       <span class="val">◈ ${save.credits}</span>
@@ -491,6 +526,17 @@ document.getElementById('hubBtnSettings').onclick = ()=>{
     persist();
     if(typeof refreshMusicVolume==='function') refreshMusicVolume();
   };
+  // Menu background theme picker — live-applies so the player can see
+  // the change behind the modal before closing settings.
+  document.querySelectorAll('#optHubBg .bgChip').forEach(chip=>{
+    chip.onclick = ()=>{
+      const id = chip.getAttribute('data-bg');
+      if(!HUB_BG_THEMES[id]) return;
+      save.hubBg = id;
+      document.querySelectorAll('#optHubBg .bgChip').forEach(c=>c.classList.toggle('sel', c===chip));
+      persist();
+    };
+  });
   document.getElementById('optHaptics').onclick = (e)=>{
     save.haptics = !save.haptics;
     e.currentTarget.classList.toggle('on', save.haptics);

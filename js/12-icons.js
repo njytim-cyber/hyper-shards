@@ -299,9 +299,190 @@ function draw3DMenuIcon(g, type){
     g.restore();
   }
 
-  // ===== Astronaut in a space fighter (Bloons-quality, space theme) =====
-  // Centered around (0,0). Ship faces right; pilot in cockpit.
+  // ===== 3/4-view space fighter (BTD6-style chunky 3D) =====
+  // Centered around (0,0). Plane points "up and toward viewer" at ~45°
+  // — top of the fuselage and the underside of the wings are both
+  // visible, like a paper-toy fighter on a glass shelf. Solid black
+  // outline, stacked extruded depth, hard cel-shading, drop-shadow
+  // disc beneath. No background — caller's canvas is transparent.
+  //
+  // The legacy cartoon-pilot plane (with the smiley face peeking
+  // through the visor and a dangly cape) has been retired; this is
+  // its replacement and uses the same parameter shape so the per-type
+  // theme calls below don't have to change.
   function drawPlane({ body='#3aa0ff', bodyShadow='#1a5a99', wing='#6cc0ff', tail='#ff66cc',
+                       prop='#ffea00', boost='#aacfff', boostShadow='#5588cc',
+                       hat='#dddddd', hatShadow='#888888',
+                       skin='#f0c089', skinShadow='#c98456',
+                       goggles='#00eaff', scarf='#ff3344', accent='#ffea00',
+                       expression='happy' } = {}){
+    // Idle bob — small vertical sway so the plane doesn't look static.
+    const bob = Math.sin(performance.now()/650) * 1.5;
+    g.save();
+    g.translate(0, bob);
+
+    // 1. Drop-shadow disc on the "ground" — sells the 3D feel.
+    g.save();
+    g.globalAlpha = 0.55;
+    g.fillStyle = '#000000';
+    g.beginPath();
+    g.ellipse(2, 30 - bob, 28, 6, 0, 0, Math.PI*2);
+    g.fill();
+    g.restore();
+
+    // Helper: stacked-layer extrude (BTD6 chunky depth). Draws `layers`
+    // copies of the path offset down-left in pure black, then the
+    // top-face fill, then a clipped highlight on the upper edge.
+    function chunky3d(drawFn, baseCol, hiCol, depth=5, lightOff=-10, lightAmt=0.55){
+      // Depth slabs (back to front, darker to base color).
+      for(let z=depth; z>0; z--){
+        g.save(); g.translate(0, z*0.85);
+        g.fillStyle = OUTLINE; drawFn(g);
+        g.restore();
+      }
+      // Top face — gradient from highlight near top to base mid to a
+      // shaded base-shadow at the bottom.
+      g.save(); drawFn(g); g.clip();
+      const grd = g.createLinearGradient(0, lightOff-12, 0, 18);
+      grd.addColorStop(0, hiCol);
+      grd.addColorStop(0.55, baseCol);
+      grd.addColorStop(1, '#0a0f1c');
+      g.fillStyle = grd; g.fillRect(-50,-60,100,100);
+      // Top sheen — clipped soft white wash on the upper third.
+      const sh = g.createLinearGradient(0, lightOff-10, 0, 4);
+      sh.addColorStop(0, `rgba(255,255,255,${lightAmt})`);
+      sh.addColorStop(1, 'rgba(255,255,255,0)');
+      g.fillStyle = sh; g.fillRect(-50,-60,100,100);
+      g.restore();
+      // Outline on top of everything.
+      g.strokeStyle = OUTLINE; g.lineWidth = 2.5; g.lineJoin='round'; drawFn(g, true);
+    }
+
+    // 2. Vertical tail fin — sits at back-top of fuselage, partly behind
+    // the cockpit dome. Drawn first so the dome paints over its base.
+    chunky3d((g, stroke)=>{
+      g.beginPath();
+      g.moveTo(-2, -4); g.lineTo(-3, -18);
+      g.lineTo(7, -14); g.lineTo(6, -4);
+      g.closePath();
+      stroke ? g.stroke() : g.fill();
+    }, tail, '#ffffff', 3);
+
+    // 3. Wings — symmetric swept-back delta from the middle of the
+    // fuselage. Pointed back and out. Drawn before the body so the
+    // body's outline sits on top.
+    chunky3d((g, stroke)=>{
+      g.beginPath();
+      g.moveTo(-26, 8);   // far-left wingtip
+      g.lineTo(-6, -2);   // root, top
+      g.lineTo( 6, -2);
+      g.lineTo(26, 8);    // far-right wingtip
+      g.lineTo(20, 14);   // trailing edge right
+      g.lineTo( 6,  6);
+      g.lineTo(-6,  6);
+      g.lineTo(-20, 14);  // trailing edge left
+      g.closePath();
+      stroke ? g.stroke() : g.fill();
+    }, wing, '#ffffff', 4, -6, 0.45);
+    // Wing accent stripe along the leading edge for definition.
+    g.save();
+    g.fillStyle = accent;
+    g.beginPath();
+    g.moveTo(-22, 9); g.lineTo(-7, 1); g.lineTo(7, 1); g.lineTo(22, 9);
+    g.lineTo(20, 11); g.lineTo(7, 3); g.lineTo(-7, 3); g.lineTo(-20, 11);
+    g.closePath(); g.fill();
+    g.strokeStyle = OUTLINE; g.lineWidth = 1; g.stroke();
+    g.restore();
+
+    // 4. Fuselage — chunky teardrop pointed up, viewer sees top + a
+    // sliver of right side via the cel-shading gradient.
+    chunky3d((g, stroke)=>{
+      g.beginPath();
+      g.moveTo( 0, -22);          // nose tip
+      g.quadraticCurveTo( 9, -14,  10,  4);
+      g.quadraticCurveTo( 9,  18,  0,  20);  // tail
+      g.quadraticCurveTo(-9,  18, -10,  4);
+      g.quadraticCurveTo(-9, -14,  0, -22);
+      g.closePath();
+      stroke ? g.stroke() : g.fill();
+    }, body, '#ffffff', 6, -16, 0.6);
+
+    // Belly stripe (accent line down the centre of the fuselage).
+    g.save();
+    g.strokeStyle = accent; g.lineWidth = 1.5;
+    g.beginPath(); g.moveTo(0, -18); g.lineTo(0, 16); g.stroke();
+    g.restore();
+
+    // 5. Cockpit canopy — clear bubble near the front of the fuselage.
+    chunky3d((g, stroke)=>{
+      g.beginPath();
+      g.moveTo(-5, -10);
+      g.quadraticCurveTo(-5, -16, 0, -16);
+      g.quadraticCurveTo( 5, -16, 5, -10);
+      g.lineTo( 4, -2);
+      g.lineTo(-4, -2);
+      g.closePath();
+      stroke ? g.stroke() : g.fill();
+    }, goggles, '#ffffff', 2, -16, 0.7);
+    // Bright sheen highlight on the canopy (sells the glass).
+    g.save();
+    g.fillStyle = '#ffffff';
+    g.globalAlpha = 0.75;
+    g.beginPath();
+    g.ellipse(-2, -12, 1.5, 3.2, -0.3, 0, Math.PI*2);
+    g.fill();
+    g.globalAlpha = 1;
+    g.restore();
+
+    // 6. Twin engine nozzles + flames — two short cylinders at the rear,
+    // each with a cel-shaded flame trailing down.
+    const nozzleY = 18;
+    for(const xOff of [-5, 5]){
+      // Nozzle ring
+      g.save(); g.translate(xOff, nozzleY);
+      g.fillStyle = OUTLINE;
+      g.beginPath(); g.ellipse(0, 0, 3, 1.6, 0, 0, Math.PI*2); g.fill();
+      g.fillStyle = '#1a1a1a';
+      g.beginPath(); g.ellipse(0, -0.4, 2, 0.9, 0, 0, Math.PI*2); g.fill();
+      g.restore();
+
+      // Flame — outer (boost color), inner white core. Wobbles slightly.
+      const wob = Math.sin(performance.now()/90 + xOff)*1.2;
+      g.save(); g.translate(xOff, nozzleY + 1);
+      celShape((g, stroke)=>{
+        g.beginPath();
+        g.moveTo(-2.5, 0);
+        g.quadraticCurveTo(-1 + wob*0.2, 6, 0, 9 + wob*0.4);
+        g.quadraticCurveTo( 1 - wob*0.2, 6, 2.5, 0);
+        g.closePath();
+        stroke ? g.stroke() : g.fill();
+      }, boost, boostShadow, '#ffffff', 1.5);
+      g.fillStyle = '#ffffff';
+      g.beginPath();
+      g.moveTo(-1, 0); g.quadraticCurveTo(0, 4, 0, 6.5);
+      g.quadraticCurveTo(0, 4, 1, 0);
+      g.closePath(); g.fill();
+      g.restore();
+    }
+
+    // 7. Tiny twinkling stars around the plane for theme flavour.
+    const tt = performance.now();
+    g.fillStyle='#ffffff';
+    for(const [sx,sy,sr] of [[-32,-18,1],[30,-14,1.2],[-26,22,0.8],[28,20,0.9]]){
+      const tw = 0.35 + 0.65*Math.abs(Math.sin(tt/300 + sx));
+      g.globalAlpha = tw;
+      g.beginPath(); g.arc(sx, sy, sr, 0, Math.PI*2); g.fill();
+    }
+    g.globalAlpha = 1;
+
+    g.restore();
+  }
+  // Original cartoon-pilot drawPlane has been retained as a reference
+  // helper but is no longer the plane mascot — the function above
+  // shadows it by name. Body of the legacy implementation kept below
+  // for any callers that explicitly want a chibi pilot in the future
+  // (search "drawPilotMascot"). We don't currently call it anywhere.
+  function _drawPilotMascot_legacy({ body='#3aa0ff', bodyShadow='#1a5a99', wing='#6cc0ff', tail='#ff66cc',
                        prop='#ffea00', boost='#aacfff', boostShadow='#5588cc',
                        hat='#dddddd', hatShadow='#888888',
                        skin='#f0c089', skinShadow='#c98456',

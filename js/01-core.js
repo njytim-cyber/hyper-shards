@@ -63,6 +63,13 @@ addEventListener('orientationchange', ()=>{
 const SAVE_KEY = 'hypershards_save_v3';
 const defaultSave = () => ({
   credits: 0,
+  // Gems showered on level-up — premium-feel cosmetic currency. Saved
+  // across runs; displayed alongside shards on the hub + HUD.
+  gems: 0,
+  // Super-coins are awarded every 3 levels. Spending one (key 9 / SUPER
+  // button) triggers a 15s ship-wide buff: 2× damage, 2× fire rate,
+  // 1.4× speed, full boost fuel + golden aura.
+  superCoins: 0,
   best: 0,
   username: 'PILOT',
   bestRound: 1,
@@ -353,6 +360,7 @@ addEventListener('keydown', e => {
     if(k==='1') useConsumable('heal');
     if(k==='2') useConsumable('shield');
     if(k==='3') useConsumable('bomb');
+    if(k==='9') triggerSuperAbility();
   } else if(state.phase==='paused'){
     if(k==='p' || k==='escape') resume();
   } else if(state.phase==='tutorial'){
