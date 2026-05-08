@@ -1,0 +1,982 @@
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:#03040a;color:#cfe9ff;font-family:'Segoe UI',system-ui,sans-serif;overflow:hidden;height:100%;width:100%;user-select:none;}
+  #wrap{position:fixed;inset:0;}
+  #game{display:block;width:100vw;height:100vh;background:radial-gradient(ellipse at center, #0a1430 0%, #02030a 70%, #000 100%);}
+  .item canvas{width:120px !important;height:70px !important;display:block;}
+
+  /* ========== HUD ========== */
+  #hud{position:fixed;top:8px;left:8px;right:8px;display:none;justify-content:space-between;align-items:flex-start;pointer-events:none;font-size:13px;letter-spacing:1px;}
+  #hud .panel{background:#0a1430cc;border:1px solid #244a78;padding:8px 12px;border-radius:8px;pointer-events:auto;backdrop-filter:blur(4px);}
+  #hud .label{color:#7ea8d4;font-size:10px;letter-spacing:2px;display:block;margin-bottom:2px;}
+  #hearts{display:flex;gap:3px;}
+  .heart{width:18px;height:16px;display:inline-block;}
+  .pill{display:inline-block;background:#102040;border:1px solid #244a78;padding:2px 8px;border-radius:10px;font-size:11px;color:#00eaff;}
+  .pill.hot{color:#ffea00;border-color:#ffaa00;}
+
+  /* status effects */
+  #fxBar{display:flex;gap:4px;margin-top:4px;}
+  .fx{background:#102040;border:1px solid #3a8acc;padding:1px 6px;border-radius:8px;font-size:10px;color:#00eaff;}
+  .fx.dmg{color:#ff66cc;border-color:#ff66cc;}
+  .fx.rapid{color:#00ffaa;border-color:#00ffaa;}
+  .fx.shield{color:#ffea00;border-color:#ffea00;}
+  .fx.slow{color:#aa88ff;border-color:#aa88ff;}
+
+  #hudBottom{position:fixed;bottom:8px;left:8px;right:8px;display:none;justify-content:space-between;font-size:11px;color:#7ea8d4;pointer-events:none;}
+  .key{display:inline-block;border:1px solid #3a8acc;border-radius:4px;padding:1px 5px;font-family:monospace;color:#00eaff;background:#0a1430cc;}
+
+  /* combo + minimap + achievements */
+  #combo{display:none;position:fixed;top:90px;right:14px;background:#0a1430cc;border:1px solid #244a78;border-radius:8px;padding:8px 14px;text-align:right;font-size:13px;letter-spacing:2px;}
+  #combo .mult{font-size:24px;font-weight:900;background:linear-gradient(90deg,#ffea00,#ff66cc);-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-shadow:0 0 12px #ffea0044;}
+  #combo .timer{display:block;width:100px;height:4px;background:#102040;border-radius:2px;overflow:hidden;margin-top:4px;}
+  #combo .timer span{display:block;height:100%;background:linear-gradient(90deg,#ffea00,#ff3366);transition:width .1s linear;}
+  #minimap{display:none;position:fixed;bottom:36px;right:14px;width:160px;height:120px;background:#02030acc;border:1px solid #244a78;border-radius:6px;}
+  #achievement{position:fixed;top:30px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#1a4a7a,#3a8acc);border:1px solid #66ccff;border-radius:8px;padding:10px 22px;text-align:center;opacity:0;transition:.3s;pointer-events:none;z-index:20;box-shadow:0 0 30px #00eaff66;}
+  #achievement .label{color:#ffea00;font-size:10px;letter-spacing:3px;}
+  #achievement .name{color:#fff;font-weight:900;letter-spacing:3px;font-size:16px;}
+  #bossBar{display:none;position:fixed;top:60px;left:50%;transform:translateX(-50%);width:60%;text-align:center;}
+  #bossBar .label{color:#ff66cc;letter-spacing:6px;text-shadow:0 0 10px #ff00cc;font-size:14px;margin-bottom:4px;}
+  .bar{width:100%;height:8px;background:#102040;border:1px solid #244a78;border-radius:4px;overflow:hidden;}
+  .bar > span{display:block;height:100%;background:linear-gradient(90deg,#ff00aa,#ffaa00);transition:width .15s;}
+
+  /* ========== Menu / overlay ========== */
+  #overlay{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:radial-gradient(ellipse at center, #0a1a3acc 0%, #02030aee 70%);backdrop-filter:blur(4px) saturate(1.2);z-index:10;overflow-y:auto;padding:20px;}
+  /* sparkle layer */
+  #overlay::before{
+    content:""; position:fixed; inset:0; pointer-events:none; z-index:-1;
+    background-image:
+      radial-gradient(circle at 12% 18%, #ffea0033 0, transparent 2px),
+      radial-gradient(circle at 88% 22%, #00eaff44 0, transparent 3px),
+      radial-gradient(circle at 25% 78%, #ff66cc33 0, transparent 2px),
+      radial-gradient(circle at 78% 82%, #66ffaa33 0, transparent 3px),
+      radial-gradient(circle at 50% 30%, #ffffff22 0, transparent 2px),
+      radial-gradient(circle at 60% 65%, #aa66ff44 0, transparent 3px);
+    animation:sparkleDrift 8s ease-in-out infinite alternate;
+  }
+  @keyframes sparkleDrift{
+    0%{transform:translate(0,0) scale(1); opacity:.8;}
+    50%{transform:translate(10px,-10px) scale(1.1); opacity:1;}
+    100%{transform:translate(-10px,8px) scale(1); opacity:.7;}
+  }
+  .menu{display:none;flex-direction:column;align-items:center;animation:fadeIn .3s;}
+  .menu.active{display:flex;}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+  h1.title{font-size:84px;margin:0;letter-spacing:12px;background:linear-gradient(90deg,#00f7ff,#ff00cc,#ffea00,#00f7ff);background-size:300% 100%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-weight:900;animation:shimmer 4s linear infinite, titleBounce 3s ease-in-out infinite;filter:drop-shadow(0 0 24px #00eaff88) drop-shadow(0 0 60px #ff00cc55);}
+  @keyframes shimmer{0%{background-position:0% 50%}100%{background-position:300% 50%}}
+  @keyframes titleBounce{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-6px) scale(1.02)}}
+  .subtitle{font-size:15px;letter-spacing:8px;color:#ffea00;margin:0 0 22px;text-shadow:0 0 14px #ff880088, 0 2px 0 #050a18;font-weight:900;}
+  .tagline{color:#cfe9ff;margin:0 0 26px;text-align:center;max-width:560px;line-height:1.6;font-size:15px;text-shadow:0 1px 0 #050a18;}
+
+  .btnRow{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin:6px 0;}
+  .btnCol{display:flex;flex-direction:column;align-items:stretch;gap:14px;margin:10px 0;width:min(440px,90vw);}
+  .btn{cursor:pointer;background:linear-gradient(135deg,#0a2a4a,#1a4a7a);border:1px solid #3a8acc;color:#cfe9ff;padding:11px 22px;border-radius:6px;font-size:14px;letter-spacing:3px;font-weight:600;transition:.15s;font-family:inherit;}
+  .btn:hover{background:linear-gradient(135deg,#1a4a7a,#3a8acc);box-shadow:0 0 24px #00eaff66;transform:translateY(-1px);}
+  .btn:disabled{opacity:.4;cursor:not-allowed;transform:none;box-shadow:none;}
+  .btn.primary{background:linear-gradient(135deg,#1a5a9a,#3a8acc);border-color:#66ccff;font-size:18px;padding:14px 36px;}
+  .btn.primary:hover{box-shadow:0 0 30px #00eaff;}
+
+  /* ===== Big juicy menu buttons (Bloons-style) ===== */
+  .btnEpic{
+    position:relative; display:flex; align-items:center; gap:20px;
+    cursor:pointer; padding:22px 28px;
+    background:linear-gradient(180deg,#1a3a6a 0%,#0a1a3a 100%);
+    border:4px solid #0a1a3a; border-radius:22px;
+    color:#fff; font-family:inherit; font-weight:900;
+    letter-spacing:3px; text-align:left;
+    transition:transform .15s cubic-bezier(.2,.8,.3,1.6), filter .2s;
+    overflow:hidden;
+    box-shadow:
+      0 6px 0 #050a18,
+      0 8px 22px #00000099,
+      inset 0 2px 0 #ffffff22,
+      inset 0 -10px 18px #00000055;
+    animation:btnIdle 2.6s ease-in-out infinite;
+  }
+  @keyframes btnIdle{ 0%,100%{transform:translateY(0)} 50%{transform:translateY(-2px)} }
+  .btnEpic:nth-child(2){ animation-delay:.2s }
+  .btnEpic:nth-child(3){ animation-delay:.4s }
+  .btnEpic:nth-child(4){ animation-delay:.6s }
+  .btnEpic::before{
+    content:""; position:absolute; inset:0;
+    background:linear-gradient(120deg,transparent 30%,#ffffff33 50%,transparent 70%);
+    transform:translateX(-100%); transition:transform .6s;
+    pointer-events:none;
+  }
+  .btnEpic:hover::before{ transform:translateX(100%); }
+  /* gradient border halo */
+  .btnEpic::after{
+    content:""; position:absolute; inset:-4px;
+    border-radius:22px;
+    background:linear-gradient(135deg,var(--c1,#00eaff),var(--c2,#ff66cc));
+    z-index:-1;
+    opacity:.6;
+    filter:blur(6px);
+    transition:opacity .2s, filter .2s;
+  }
+  .btnEpic:hover{ transform:translateY(-6px) scale(1.04) rotate(-.5deg); filter:brightness(1.2) saturate(1.2); animation:none; }
+  .btnEpic:hover::after{ opacity:1; filter:blur(12px); }
+  .btnEpic:active{ transform:translateY(-1px) scale(.98); box-shadow:0 2px 0 #050a18, 0 4px 12px #00000099, inset 0 2px 0 #ffffff22; }
+  .btnEpic .ic{
+    position:relative;
+    flex-shrink:0; width:96px; height:96px;
+    display:flex; align-items:flex-end; justify-content:center;
+    transition:transform .25s cubic-bezier(.2,.8,.3,1.6);
+    animation:icBob 2.4s ease-in-out infinite;
+  }
+  /* circular pedestal behind the mascot */
+  .btnEpic .ic::before{
+    content:""; position:absolute; left:50%; top:50%;
+    width:88px; height:88px; border-radius:50%;
+    transform:translate(-50%,-50%);
+    background:radial-gradient(circle at 30% 22%, #ffffff 0%, var(--c1,#00eaff) 35%, #050a18 110%);
+    box-shadow:
+      0 0 28px var(--c1,#00eaff)bb,
+      inset 0 -10px 18px #00000077,
+      inset 0 6px 10px #ffffff66,
+      0 5px 0 #050a18;
+  }
+  /* shadow disc under the mascot */
+  .btnEpic .ic::after{
+    content:""; position:absolute; left:50%; bottom:6px;
+    width:64px; height:10px; border-radius:50%;
+    transform:translateX(-50%);
+    background:radial-gradient(ellipse at center, #00000088, transparent 70%);
+    pointer-events:none;
+  }
+  @keyframes icBob{ 0%{transform:translateY(0) rotate(-3deg)} 50%{transform:translateY(-7px) rotate(3deg)} 100%{transform:translateY(0) rotate(-3deg)} }
+  .btnEpic:nth-child(1) .ic{ animation-delay:.0s }
+  .btnEpic:nth-child(2) .ic{ animation-delay:.4s }
+  .btnEpic:nth-child(3) .ic{ animation-delay:.8s }
+  .btnEpic:nth-child(4) .ic{ animation-delay:1.2s }
+  .btnEpic:hover .ic{ transform:scale(1.15) rotate(-4deg); animation:none; }
+  .btnEpic .ic canvas{ position:relative; width:96px !important; height:96px !important; display:block; pointer-events:none; z-index:1; filter:drop-shadow(0 4px 0 #050a18); }
+  .btnEpic .lbl{ flex:1; }
+  .btnEpic .lbl .t{
+    display:block; font-size:30px; letter-spacing:6px;
+    background:linear-gradient(180deg,#ffffff 0%,var(--c1,#00eaff) 60%,var(--c2,#ff66cc) 100%);
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+    filter:drop-shadow(0 2px 0 #050a18);
+    text-transform:uppercase;
+  }
+  .btnEpic .lbl .s{ display:block; font-size:12px; letter-spacing:2px; color:#9ec5ff; font-weight:600; margin-top:4px; text-shadow:0 1px 0 #050a18; }
+  .btnEpic .arrow{ font-size:36px; color:#fff; transition:transform .25s; flex-shrink:0; filter:drop-shadow(0 0 8px var(--c1,#00eaff)); }
+  .btnEpic:hover .arrow{ transform:translateX(10px) scale(1.2); }
+
+  .btnEpic.play     { --c1:#00eaff; --c2:#66ffaa; }
+  .btnEpic.pvp      { --c1:#ff3366; --c2:#ff9933; }
+  .btnEpic.boss     { --c1:#ff00aa; --c2:#ffaa00; }
+  .btnEpic.shop     { --c1:#ffea00; --c2:#ff8800; }
+  .btnEpic.tut      { --c1:#aa66ff; --c2:#ff66cc; }
+  .btnEpic.danger   { --c1:#ff3344; --c2:#aa1111; }
+  .btnEpic.danger .lbl .t{ font-size:16px; letter-spacing:4px; }
+  .btnEpic.danger .ic{ font-size:22px; }
+
+  @media (max-width:700px){
+    .btnEpic{ padding:14px 16px; gap:12px; }
+    .btnEpic .ic{ width:44px; height:44px; font-size:22px; border-radius:10px; }
+    .btnEpic .lbl .t{ font-size:17px; letter-spacing:4px; }
+    .btnEpic .lbl .s{ font-size:10px; }
+    .btnEpic .arrow{ font-size:20px; }
+    .btnCol{ width:96vw; gap:10px; }
+  }
+  .btn.buy{background:linear-gradient(135deg,#2a0a4a,#5a1a7a);border-color:#cc3aff;}
+  .btn.buy:hover{box-shadow:0 0 24px #ff00cc88;}
+  .btn.danger{background:linear-gradient(135deg,#4a0a1a,#7a1a2a);border-color:#ff5577;}
+  .btn.small{padding:8px 14px;font-size:12px;letter-spacing:2px;}
+  .btn.diff{
+    min-width:200px;text-align:left;padding:16px 22px;
+    background:linear-gradient(180deg,#1a3a6a,#0a1a3a);
+    border:3px solid #050a18; border-radius:18px;
+    box-shadow:0 4px 0 #050a18, 0 6px 14px #00000088, inset 0 2px 0 #ffffff22;
+    font-weight:900; letter-spacing:4px; font-size:16px;
+    color:#ffea00; text-shadow:0 1px 0 #050a18;
+    transition:transform .15s cubic-bezier(.2,.8,.3,1.6);
+  }
+  .btn.diff:hover{ transform:translateY(-4px) scale(1.04); box-shadow:0 8px 0 #050a18, 0 14px 22px #00000099, inset 0 2px 0 #ffffff33; filter:brightness(1.15); }
+  .btn.diff:active{ transform:translateY(-1px) scale(.98); box-shadow:0 2px 0 #050a18, 0 3px 8px #00000099, inset 0 2px 0 #ffffff22; }
+  .btn.diff small{display:block;font-size:11px;letter-spacing:1px;color:#9ec5ff;margin-top:5px;font-weight:600;}
+
+  /* Save bar — coin badge style.
+     z-index sits above #overlay (z:10) so the bar isn't dimmed by the
+     overlay's dark backdrop on menu screens. */
+  #saveBar{
+    position:fixed;top:18px;right:18px;display:flex;gap:14px;align-items:center;
+    background:linear-gradient(180deg,#1a3a6a,#0a1a3a);
+    border:3px solid #050a18;
+    border-radius:30px; padding:8px 18px;
+    font-size:14px;letter-spacing:1px; font-weight:900;
+    box-shadow:0 4px 0 #050a18, 0 6px 18px #00000099, inset 0 2px 0 #ffffff22;
+    z-index:11;
+  }
+  #saveBar.hidden{display:none;}
+  #saveBar .v{color:#ffea00;font-weight:900;text-shadow:0 1px 0 #050a18;}
+  #saveBar .coin{
+    display:inline-block; width:22px; height:22px; border-radius:50%;
+    background:radial-gradient(circle at 30% 25%, #ffffff,#ffea00 50%,#aa6600);
+    box-shadow:0 0 10px #ffea00aa, inset 0 -4px 6px #00000044;
+    animation:coinSpin 3s linear infinite;
+    line-height:22px; text-align:center; font-size:11px; color:#7a4400;
+  }
+  @keyframes coinSpin{ 0%{transform:scaleX(1)} 50%{transform:scaleX(.3)} 100%{transform:scaleX(1)} }
+
+  /* Shop */
+  #menuShop{width:min(1100px, 96vw); max-height:92vh;}
+  #shopScroll{overflow-y:auto; max-height:62vh; width:100%; padding:4px 8px 12px; scrollbar-width:thin; scrollbar-color:#3a8acc #0a1430;}
+  #shopScroll::-webkit-scrollbar{width:10px;}
+  #shopScroll::-webkit-scrollbar-track{background:#0a1430;border-radius:5px;}
+  #shopScroll::-webkit-scrollbar-thumb{background:linear-gradient(135deg,#1a4a7a,#3a8acc);border-radius:5px;}
+  #shop .grid{display:flex;flex-direction:column;gap:8px;margin-top:6px;width:100%;}
+  .item{display:flex;align-items:center;gap:14px;padding:12px 16px;}
+  .item .info{flex:1;}
+  .item .info h3{margin-bottom:3px;}
+  .item .actions{flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:6px;min-width:120px;}
+  .item .actions .price{color:#ffea00;font-size:13px;}
+  .item .lvl{display:flex;gap:2px;margin:4px 0;}
+  .item .iconBox{flex-shrink:0;width:64px;height:64px;background:#02030a;border:1px solid #1f4d7a;border-radius:6px;display:flex;align-items:center;justify-content:center;}
+  .item .iconBox canvas{width:60px !important;height:60px !important;display:block;}
+  .item{background:#0a1430dd;border:1px solid #244a78;border-radius:8px;padding:12px;text-align:left;}
+  .item h3{margin:0 0 4px;color:#ffea00;font-size:14px;letter-spacing:2px;font-weight:700;}
+  .item p{margin:4px 0;font-size:12px;color:#9ec5ff;line-height:1.4;}
+  .item .row{display:flex;justify-content:space-between;align-items:center;margin-top:8px;}
+  .item .lvl{display:flex;gap:2px;margin:6px 0;}
+  .item .lvl .dot{width:14px;height:6px;background:#244a78;border-radius:2px;}
+  .item .lvl .dot.on{background:linear-gradient(90deg,#00eaff,#00ffaa);}
+  .item.skin{display:flex;align-items:center;gap:14px;text-align:left;}
+  .item.skin canvas{flex-shrink:0;background:#02030a;border:1px solid #1f4d7a;border-radius:4px;}
+  .item.skin .info{flex:1;}
+  .item.skin .info h3{margin-bottom:4px;}
+  .item.skin .info p{margin:2px 0;font-size:11px;color:#7ea8d4;}
+  .item.skin .actions{flex-shrink:0;text-align:right;}
+  .item.skin .actions .price{display:block;color:#ffea00;margin-bottom:6px;font-size:12px;}
+
+  .tabs{display:flex;gap:6px;margin:14px 0 6px;}
+  .tab{background:#0a1430;border:1px solid #244a78;color:#7ea8d4;padding:8px 18px;border-radius:6px;cursor:pointer;letter-spacing:2px;font-size:12px;}
+  .tab.active{background:linear-gradient(135deg,#1a4a7a,#3a8acc);color:#fff;border-color:#66ccff;}
+
+  /* Tutorial */
+  #tut .step{background:#0a1430dd;border:1px solid #00eaff;border-radius:8px;padding:14px 20px;max-width:520px;margin:10px;}
+  #tut .step h3{margin:0 0 6px;color:#00eaff;letter-spacing:3px;font-size:16px;}
+  #tut .step p{margin:0;color:#cfe9ff;line-height:1.5;font-size:14px;}
+
+  /* Toast */
+  #toast{position:fixed;bottom:60px;left:50%;transform:translateX(-50%);background:#0a1430ee;border:1px solid #00eaff;color:#cfe9ff;padding:8px 16px;border-radius:6px;opacity:0;transition:.3s;pointer-events:none;font-size:13px;letter-spacing:2px;z-index:20;}
+
+  /* Tutorial in-game caption */
+  #tutCaption{position:fixed;top:80px;left:50%;transform:translateX(-50%);background:#0a1430ee;border:1px solid #00eaff;color:#fff;padding:10px 20px;border-radius:8px;font-size:14px;letter-spacing:2px;display:none;z-index:9;text-align:center;max-width:600px;box-shadow:0 0 30px #00eaff66;}
+  #tutCaption .next{color:#ffea00;font-size:11px;display:block;margin-top:4px;}
+
+  .hidden{display:none !important;}
+
+  /* VS AI score */
+  #pvpScore{display:none;position:fixed;top:14px;left:50%;transform:translateX(-50%);background:#0a1430cc;border:1px solid #244a78;border-radius:8px;padding:8px 18px;font-size:14px;letter-spacing:3px;}
+  #pvpScore .you{color:#00eaff;}
+  #pvpScore .ai{color:#ff66cc;}
+
+  /* ===== Touch controls ===== */
+  #touch{position:fixed;inset:0;pointer-events:none;display:none;z-index:8;}
+  #touch.on{display:block;}
+  #stick{position:absolute;left:30px;bottom:30px;width:140px;height:140px;border-radius:50%;background:#0a1430aa;border:2px solid #3a8acc88;pointer-events:auto;touch-action:none;}
+  #stick .nub{position:absolute;left:50%;top:50%;width:60px;height:60px;border-radius:50%;background:#3a8accaa;border:2px solid #00eaff;transform:translate(-50%,-50%);box-shadow:0 0 18px #00eaff66;}
+  .tBtn{position:absolute;width:80px;height:80px;border-radius:50%;background:#0a1430cc;border:2px solid #3a8acc;color:#cfe9ff;font-weight:900;letter-spacing:2px;font-size:14px;text-align:center;line-height:80px;pointer-events:auto;touch-action:none;user-select:none;-webkit-user-select:none;text-shadow:0 0 6px #00eaff;font-family:inherit;
+    /* SVG-icon variant — when the button has an <svg> child it needs
+       flex centering instead of line-height. The line-height is kept
+       above for the text fallbacks (cons buttons still use glyphs). */
+    padding:0;
+  }
+  .tBtn svg{display:block;margin:auto;filter:drop-shadow(0 0 4px currentColor);}
+  .tBtn:has(svg){display:flex;align-items:center;justify-content:center;line-height:0;}
+  .tBtn:active,.tBtn.held{transform:scale(0.92);box-shadow:0 0 22px #00eaff;background:#1a4a7acc;}
+  .tBtn.fire{right:30px;bottom:30px;width:110px;height:110px;line-height:110px;font-size:18px;border-color:#ffea00;color:#ffea00;text-shadow:0 0 8px #ffea00;}
+  .tBtn.ability{right:155px;bottom:75px;border-color:#ff66cc;color:#ff66cc;text-shadow:0 0 8px #ff66cc;}
+  .tBtn.weapon{right:30px;bottom:160px;width:64px;height:64px;line-height:64px;font-size:11px;}
+  .tBtn.boost{left:200px;bottom:75px;width:64px;height:64px;line-height:64px;font-size:11px;border-color:#00ffaa;color:#00ffaa;}
+  .tBtn.pause{top:14px;right:14px;width:50px;height:50px;line-height:50px;font-size:14px;}
+  .tBtn.cons{position:absolute;width:50px;height:50px;line-height:50px;font-size:11px;}
+  #cons1{left:30px;top:140px;border-color:#00ffaa;color:#00ffaa;}
+  #cons2{left:90px;top:140px;border-color:#ffea00;color:#ffea00;}
+  #cons3{left:150px;top:140px;border-color:#ff9933;color:#ff9933;}
+
+  /* responsive: tighter HUD on narrow screens */
+  @media (max-width: 700px){
+    h1.title{font-size:38px;letter-spacing:5px;}
+    .subtitle{font-size:11px;letter-spacing:3px;margin:0 0 16px;}
+    .tagline{font-size:13px;}
+    .btn{padding:9px 14px;font-size:12px;letter-spacing:1px;}
+    .btn.primary{font-size:14px;padding:11px 18px;}
+    .btn.diff{min-width:140px;}
+    #hud{font-size:11px;}
+    #hud .panel{padding:5px 8px;}
+    .heart{width:13px;height:11px;}
+    #combo{padding:5px 9px;font-size:11px;top:80px;right:8px;}
+    #combo .mult{font-size:18px;}
+    #minimap{display:none !important;}
+    #menuShop{width:96vw;}
+    .item{padding:8px 10px;gap:8px;}
+    .item h3{font-size:13px;}
+    .item p{font-size:11px;}
+    .item .iconBox{width:48px;height:48px;}
+    .item .iconBox canvas{width:46px !important;height:46px !important;}
+    .item.skin canvas{width:80px !important;height:54px !important;}
+    .item .actions{min-width:90px;}
+    #hudBottom{display:none !important;}
+    #saveBar{font-size:11px;padding:5px 9px;}
+    .tabs{flex-wrap:wrap;justify-content:center;gap:4px;}
+    .tab{padding:6px 12px;font-size:11px;}
+  }
+  @media (max-height: 500px){
+    #stick{width:110px;height:110px;left:18px;bottom:18px;}
+    #stick .nub{width:46px;height:46px;}
+    .tBtn.fire{width:90px;height:90px;line-height:90px;right:18px;bottom:18px;}
+    .tBtn.ability{right:120px;bottom:55px;width:64px;height:64px;line-height:64px;}
+    .tBtn.weapon{bottom:120px;right:18px;}
+    .tBtn.boost{left:140px;bottom:55px;}
+  }
+  /* ===== Bloons-style hub layout ===== */
+  #menuMain{display:none; padding:0; width:100vw; max-width:none; height:100vh; max-height:none; align-items:stretch; justify-content:stretch; flex-direction:column; position:fixed; inset:0;}
+  #menuMain.active{display:flex;}
+  #hubScene{position:absolute; inset:0; z-index:0;}
+  #hubTop{position:absolute; top:0; left:0; right:0; display:flex; justify-content:space-between; align-items:flex-start; padding:14px 18px; pointer-events:none; z-index:3;}
+  #hubTop > *{pointer-events:auto;}
+
+  /* Pilot badge top-left */
+  .pilotBadge{display:flex; align-items:center; gap:10px; background:linear-gradient(180deg,#1a3a6a,#0a1a3a); border:3px solid #050a18; border-radius:50px; padding:6px 16px 6px 6px; box-shadow:0 4px 0 #050a18, 0 6px 16px #00000099, inset 0 2px 0 #ffffff22; font-weight:900; letter-spacing:2px;}
+  .pilotBadge .lvl{display:flex; align-items:center; justify-content:center; width:46px; height:46px; border-radius:50%; background:linear-gradient(180deg,#aa66ff,#5533aa); border:3px solid #050a18; color:#fff; font-size:18px; font-weight:900; text-shadow:0 2px 0 #000; box-shadow:inset 0 -4px 6px #00000077, inset 0 3px 4px #ffffff66;}
+  .pilotBadge .info{display:flex; flex-direction:column; line-height:1.1;}
+  .pilotBadge .name{color:#ffea00; font-size:14px; text-shadow:0 1px 0 #050a18;}
+  .pilotBadge .xpwrap{display:flex; align-items:center; gap:6px; margin-top:2px;}
+  .pilotBadge .xpbar{position:relative; width:170px; height:14px; background:#050a18; border:2px solid #050a18; border-radius:8px; overflow:hidden; box-shadow:inset 0 2px 0 #000; }
+  .pilotBadge .xpbar > span{display:block; height:100%; background:linear-gradient(180deg,#aa66ff,#5533aa); border-right:2px solid #ffffff66;}
+  .pilotBadge .xpwrap .num{font-size:11px; color:#cfe9ff;}
+
+  /* Currency top-right */
+  .shardBar{display:flex; align-items:center; gap:8px; background:linear-gradient(180deg,#1a3a6a,#0a1a3a); border:3px solid #050a18; border-radius:50px; padding:6px 14px; box-shadow:0 4px 0 #050a18, 0 6px 16px #00000099, inset 0 2px 0 #ffffff22; font-weight:900; letter-spacing:2px;}
+  .shardBar .gem{width:28px; height:28px; border-radius:50%; background:radial-gradient(circle at 30% 25%,#ffffff,#ffea00 50%,#aa6600); border:2px solid #050a18; box-shadow:0 0 10px #ffea00aa, inset 0 -3px 6px #00000077; display:flex; align-items:center; justify-content:center; color:#7a4400; font-size:14px;}
+  .shardBar .v{color:#ffea00; font-size:18px; text-shadow:0 2px 0 #050a18;}
+  .shardBar .plus{width:30px; height:30px; border-radius:50%; background:linear-gradient(180deg,#3aa0ff,#1a4477); border:3px solid #050a18; color:#fff; font-size:18px; line-height:24px; text-align:center; box-shadow:inset 0 -3px 6px #00000077, inset 0 3px 4px #ffffff66; cursor:pointer;}
+
+  /* Center event ribbon */
+  .eventRibbon{margin:0 auto; max-width:480px; background:linear-gradient(180deg,#ffaa00,#cc6600); border:3px solid #050a18; border-radius:0 0 14px 14px; padding:6px 28px 10px; text-align:center; box-shadow:0 4px 0 #050a18, 0 6px 16px #00000099, inset 0 2px 0 #ffffff44; transform:translateY(-4px);}
+  .eventRibbon .t{color:#fff; font-size:13px; letter-spacing:4px; font-weight:900; text-shadow:0 2px 0 #050a18; text-transform:uppercase;}
+  .eventRibbon .s{color:#ffea00; font-size:11px; letter-spacing:2px; text-shadow:0 1px 0 #050a18; margin-top:2px;}
+
+  /* Side icon column (left) */
+  #hubSideL{position:absolute; left:18px; top:110px; display:flex; flex-direction:column; gap:18px; z-index:3;}
+  #hubSideR{position:absolute; right:18px; top:110px; display:flex; flex-direction:column; gap:18px; z-index:3; align-items:flex-end;}
+  .sideSlot{position:relative; display:flex; flex-direction:column; align-items:center; gap:0;}
+  .sideSlot .sideLbl{
+    position:relative; margin-top:-10px; z-index:2;
+    background:linear-gradient(180deg,#ffea00,#cc8800);
+    border:3px solid #050a18; border-radius:8px;
+    padding:2px 10px;
+    font-size:10px; letter-spacing:2px; font-weight:900;
+    color:#050a18; text-transform:uppercase;
+    box-shadow:0 3px 0 #050a18, 0 0 12px var(--c1,#3aa0ff)88;
+    text-shadow:0 1px 0 #ffffff44;
+    white-space:nowrap;
+    animation:btnIdle 3.2s ease-in-out infinite;
+  }
+  .sideSlot .sideLbl::before, .sideSlot .sideLbl::after{
+    content:""; position:absolute; top:50%; width:6px; height:10px;
+    background:linear-gradient(180deg,#aa6600,#552200);
+    border:2px solid #050a18; border-radius:1px;
+    transform:translateY(-50%);
+  }
+  .sideSlot .sideLbl::before{ left:-6px; clip-path:polygon(0 0, 100% 0, 100% 100%, 0 100%, 50% 50%); }
+  .sideSlot .sideLbl::after{ right:-6px; clip-path:polygon(0 0, 100% 0, 50% 50%, 100% 100%, 0 100%); }
+  .sideBtn{
+    position:relative; width:72px; height:72px; border-radius:50%;
+    background:radial-gradient(circle at 30% 22%, #ffffff 0%, var(--c1,#3aa0ff) 35%, #050a18 110%);
+    border:4px solid #050a18;
+    box-shadow:
+      0 5px 0 #050a18,
+      0 8px 18px var(--c1,#3aa0ff)55,
+      0 0 22px var(--c1,#3aa0ff)44,
+      inset 0 -8px 14px #00000077,
+      inset 0 5px 8px #ffffff66;
+    display:flex; align-items:center; justify-content:center;
+    font-size:30px; color:#fff;
+    text-shadow:0 2px 0 #050a18, 0 0 8px var(--c1,#3aa0ff)cc;
+    cursor:pointer; font-family:inherit;
+    transition:transform .2s cubic-bezier(.2,.8,.3,1.6), filter .2s, box-shadow .2s;
+    animation:btnIdle 2.6s ease-in-out infinite;
+    overflow:visible;
+  }
+  /* pulsing aura halo */
+  .sideBtn::before{
+    content:""; position:absolute; inset:-10px; border-radius:50%;
+    background:radial-gradient(circle, var(--c1,#3aa0ff)44 0%, var(--c1,#3aa0ff)00 70%);
+    filter:blur(6px); z-index:-2;
+    animation:auraPulse 2.4s ease-in-out infinite;
+  }
+  /* rotating dashed orbit */
+  .sideBtn::after{
+    content:""; position:absolute; inset:-5px; border-radius:50%;
+    border:2px dashed var(--c1,#3aa0ff); opacity:.55;
+    animation:ringOrbit 7s linear infinite;
+    z-index:-1;
+  }
+  .sideBtn:hover{
+    transform:translateY(-6px) scale(1.14);
+    filter:brightness(1.25) saturate(1.4);
+    animation:none;
+    box-shadow:
+      0 11px 0 #050a18,
+      0 14px 28px var(--c1,#3aa0ff)cc,
+      0 0 40px var(--c1,#3aa0ff)cc,
+      inset 0 -8px 14px #00000077,
+      inset 0 5px 8px #ffffff88;
+  }
+  .sideBtn:hover::after{ animation-duration:2s; opacity:1; }
+  .sideBtn:active{transform:translateY(-1px) scale(.96); box-shadow:0 2px 0 #050a18, 0 3px 8px #00000099;}
+
+  /* theme colors per button id */
+  #hubBtnSettings  { --c1:#3aa0ff; animation-delay:.0s; }
+  #hubBtnAchv      { --c1:#ffaa00; animation-delay:.3s; }
+  #hubBtnDaily     { --c1:#ff66cc; animation-delay:.6s; }
+  #hubBtnLeaderboard{ --c1:#aa66ff; animation-delay:.0s; }
+  #hubBtnReset     { --c1:#ff3344; animation-delay:.4s; }
+
+  .sideBtn .badge{
+    position:absolute; top:-5px; right:-5px;
+    min-width:20px; height:20px; padding:0 5px;
+    border-radius:11px;
+    background:linear-gradient(180deg,#ff5566,#aa1122);
+    border:2px solid #050a18; color:#fff; font-size:11px;
+    line-height:16px; text-align:center; font-weight:900;
+    box-shadow:0 2px 0 #050a18, 0 0 10px #ff334488;
+    text-shadow:0 1px 0 #050a18;
+    animation:badgePulse 1.6s ease-in-out infinite;
+  }
+  @keyframes badgePulse{ 0%,100%{transform:scale(1)} 50%{transform:scale(1.15)} }
+
+  /* tooltip on hover */
+  .sideBtn[data-tip]::before{ /* shared with aura */ }
+  .sideBtn .tip{
+    position:absolute; left:74px; top:50%; transform:translateY(-50%) translateX(-6px);
+    background:linear-gradient(180deg,#1a3a6a,#0a1a3a); color:#ffea00;
+    border:2px solid #050a18; border-radius:8px; padding:4px 10px;
+    font-size:11px; letter-spacing:2px; font-weight:900;
+    white-space:nowrap; opacity:0; pointer-events:none;
+    transition:opacity .2s, transform .2s;
+    box-shadow:0 3px 0 #050a18, 0 0 14px var(--c1,#3aa0ff)88;
+    text-shadow:0 1px 0 #050a18;
+    z-index:10;
+  }
+  /* right-side tooltips flip to the left */
+  #hubSideR .sideBtn .tip{ left:auto; right:74px; transform:translateY(-50%) translateX(6px); }
+  .sideBtn:hover .tip{ opacity:1; transform:translateY(-50%) translateX(0); }
+
+  /* Title */
+  #hubTitle{position:absolute; left:50%; top:90px; transform:translateX(-50%); z-index:2; text-align:center; pointer-events:none;}
+  .hubTitleText{margin:0; font-size:56px; letter-spacing:14px; font-weight:900;
+    background:linear-gradient(180deg,#ffffff 0%,#00eaff 35%,#ff00cc 70%,#ffea00 100%);
+    background-size:100% 300%;
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+    filter:drop-shadow(0 0 18px #00eaffaa) drop-shadow(0 0 50px #ff00cc88) drop-shadow(0 4px 0 #050a18);
+    animation:hubTitleShimmer 3s linear infinite, hubTitleBob 3s ease-in-out infinite;}
+  @keyframes hubTitleShimmer{0%{background-position:0% 0%}100%{background-position:0% 300%}}
+  @keyframes hubTitleBob{0%,100%{transform:translateY(0) scale(1)} 50%{transform:translateY(-4px) scale(1.02)}}
+  .hubTitleSub{margin-top:4px; font-size:14px; letter-spacing:8px; color:#ffea00; font-weight:900; text-shadow:0 0 14px #ffea0088, 0 2px 0 #050a18;}
+
+  /* Hero centerpiece — large, centered between title and bottom nav (BTD6-style) */
+  #hubCenter{position:absolute; left:0; right:0; top:18%; bottom:240px; z-index:1; display:flex; align-items:center; justify-content:center;}
+  #hubHero canvas{width:380px; height:380px;}
+  #hubHero{position:relative; z-index:2;}
+  #hubHero canvas{width:320px; height:320px; display:block; filter:drop-shadow(0 12px 0 #050a18) drop-shadow(0 18px 40px #00eaff66) drop-shadow(0 0 30px #ff00cc55); animation:heroFloat 4s ease-in-out infinite;}
+  @keyframes heroFloat{0%,100%{transform:translateY(0) rotate(-2deg)} 50%{transform:translateY(-18px) rotate(2deg)}}
+  #hubHero .pedestal{position:absolute; left:50%; bottom:-10px; width:240px; height:50px; transform:translateX(-50%); background:radial-gradient(ellipse at center, #00eaff66 0%, #ff00cc33 40%, transparent 70%); pointer-events:none; animation:pedestalPulse 3s ease-in-out infinite;}
+  @keyframes pedestalPulse{0%,100%{opacity:.7; transform:translateX(-50%) scale(1)} 50%{opacity:1; transform:translateX(-50%) scale(1.15)}}
+
+  /* Pulsing energy ring around hero */
+  #hubHero::before{
+    content:""; position:absolute; left:50%; top:50%; width:420px; height:420px;
+    transform:translate(-50%,-50%); border-radius:50%;
+    border:3px dashed #00eaff66;
+    animation:ringSpin 12s linear infinite;
+    pointer-events:none;
+  }
+  #hubHero::after{
+    content:""; position:absolute; left:50%; top:50%; width:340px; height:340px;
+    transform:translate(-50%,-50%); border-radius:50%;
+    border:2px solid #ff00cc77;
+    animation:ringSpin 8s linear infinite reverse;
+    pointer-events:none; box-shadow:0 0 50px #ff00cc55, inset 0 0 50px #00eaff44;
+  }
+  @keyframes ringSpin{0%{transform:translate(-50%,-50%) rotate(0)} 100%{transform:translate(-50%,-50%) rotate(360deg)}}
+
+  /* Nav row — anchored to bottom with safe margin (BTD6-style) */
+  #hubBottom{position:absolute; left:0; right:0; bottom:30px; padding:0 12px; display:flex; justify-content:center; align-items:flex-end; gap:22px; z-index:3; pointer-events:none;}
+  #hubBottom > *{pointer-events:auto;}
+  .navBtn{position:relative; display:flex; flex-direction:column; align-items:center; gap:6px; cursor:pointer; background:none; border:none; font-family:inherit; padding:0;}
+
+  /* Outer energy aura — pulsing glow halo behind every button */
+  .navBtn .ring::before{
+    content:""; position:absolute; inset:-14px; border-radius:50%;
+    background:radial-gradient(circle, var(--c1,#3aa0ff)55 0%, var(--c1,#3aa0ff)00 70%);
+    filter:blur(8px); z-index:-2;
+    animation:auraPulse 2.4s ease-in-out infinite;
+  }
+  @keyframes auraPulse{0%,100%{opacity:.45;transform:scale(.92)} 50%{opacity:1;transform:scale(1.12)}}
+
+  /* Rotating dashed energy ring (orbits the button) */
+  .navBtn .ring::after{
+    content:""; position:absolute; inset:-8px; border-radius:50%;
+    border:2.5px dashed var(--c1,#3aa0ff);
+    opacity:.7;
+    animation:ringOrbit 6s linear infinite;
+    z-index:-1;
+    box-shadow:0 0 18px var(--c1,#3aa0ff)88;
+  }
+  @keyframes ringOrbit{0%{transform:rotate(0)} 100%{transform:rotate(360deg)}}
+
+  .navBtn .ring{
+    position:relative; width:96px; height:96px; border-radius:50%;
+    background:
+      radial-gradient(circle at 30% 22%, #ffffff 0%, var(--c1,#3aa0ff) 35%, #050a18 110%);
+    border:4px solid #050a18;
+    box-shadow:
+      0 6px 0 #050a18,
+      0 10px 28px var(--c1,#3aa0ff)66,
+      0 0 30px var(--c1,#3aa0ff)55,
+      inset 0 -10px 18px #00000077,
+      inset 0 6px 10px #ffffff66;
+    display:flex; align-items:center; justify-content:center;
+    transition:transform .25s cubic-bezier(.2,.8,.3,1.6), filter .2s, box-shadow .2s;
+    animation:btnIdle 3s ease-in-out infinite;
+    overflow:hidden;
+  }
+  /* Sweeping shine */
+  .navBtn .ring > .shine{
+    content:""; position:absolute; inset:0; border-radius:50%;
+    background:conic-gradient(from 0deg, transparent 0%, #ffffff44 8%, transparent 18%, transparent 100%);
+    animation:shineSpin 3.5s linear infinite;
+    pointer-events:none;
+  }
+  @keyframes shineSpin{0%{transform:rotate(0)} 100%{transform:rotate(360deg)}}
+  .navBtn:hover .ring{
+    transform:translateY(-10px) scale(1.14);
+    filter:brightness(1.25) saturate(1.4);
+    animation:none;
+    box-shadow:
+      0 12px 0 #050a18,
+      0 18px 40px var(--c1,#3aa0ff)bb,
+      0 0 60px var(--c1,#3aa0ff)cc,
+      inset 0 -10px 18px #00000077,
+      inset 0 6px 10px #ffffff88;
+  }
+  .navBtn:hover .ring::after{ animation-duration:1.4s; opacity:1; }
+  .navBtn:active .ring{transform:translateY(-2px) scale(.96); box-shadow:0 2px 0 #050a18, 0 3px 8px #00000099, inset 0 -10px 18px #00000077;}
+  .navBtn .ring canvas{width:90% !important; height:90% !important; display:block; pointer-events:none; position:relative; z-index:1; filter:drop-shadow(0 2px 0 #050a18);}
+  /* Label — gradient + glow */
+  .navBtn .lbl{
+    font-size:15px; letter-spacing:4px; font-weight:900;
+    background:linear-gradient(180deg,#ffffff 0%,#ffea00 60%,#ff8800 100%);
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+    filter:drop-shadow(0 2px 0 #050a18) drop-shadow(0 0 10px #ffea0066);
+    text-transform:uppercase;
+    transition:transform .2s, filter .2s;
+  }
+  .navBtn:hover .lbl{
+    transform:scale(1.08);
+    filter:drop-shadow(0 2px 0 #050a18) drop-shadow(0 0 18px #ffffff);
+  }
+  /* Ribbon */
+  .navBtn .ribbon{
+    position:absolute; top:-14px; left:50%;
+    transform:translateX(-50%) rotate(-6deg);
+    background:linear-gradient(180deg,#ff3344,#aa1122);
+    color:#fff; font-size:11px; letter-spacing:2px; padding:4px 14px;
+    border-radius:6px; border:2px solid #050a18; font-weight:900;
+    text-shadow:0 1px 0 #050a18;
+    box-shadow:0 3px 0 #050a18, 0 5px 14px #ff334466;
+    z-index:5;
+    animation:ribbonWobble 1.6s ease-in-out infinite;
+  }
+  @keyframes ribbonWobble{0%,100%{transform:translateX(-50%) rotate(-6deg)} 50%{transform:translateX(-50%) rotate(-2deg) scale(1.06)}}
+
+  /* BIG PLAY button — extra royal treatment */
+  .navBtn.big .ring{
+    width:160px; height:160px;
+    box-shadow:
+      0 10px 0 #050a18,
+      0 16px 50px var(--c1,#00d977)cc,
+      0 0 80px var(--c1,#00d977)aa,
+      inset 0 -16px 24px #00000088,
+      inset 0 10px 16px #ffffff77;
+  }
+  .navBtn.big .ring::before{ inset:-22px; filter:blur(14px); }
+  .navBtn.big .ring::after{ inset:-14px; border-width:3.5px; }
+  .navBtn.big .lbl{
+    font-size:22px; letter-spacing:7px;
+    background:linear-gradient(180deg,#ffffff 0%,#aaffd4 50%,#00d977 100%);
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+    filter:drop-shadow(0 3px 0 #050a18) drop-shadow(0 0 24px #00d977bb);
+  }
+  /* Extra orbiting "spark" on PLAY — a gold dot riding the rotating ring */
+  .navBtn.big .ring::before{
+    background:radial-gradient(circle, var(--c1,#00d977)77 0%, var(--c1,#00d977)00 65%);
+  }
+  .navBtn.big::after{
+    content:""; position:absolute; left:50%; top:30px;
+    width:14px; height:14px; border-radius:50%;
+    background:radial-gradient(circle at 30% 25%, #ffffff, #ffea00 50%, #aa6600);
+    box-shadow:0 0 16px #ffea00, 0 0 30px #ffea00cc;
+    margin-left:-7px;
+    transform-origin:7px 50px;
+    animation:orbitSpark 3s linear infinite;
+    pointer-events:none;
+    z-index:4;
+  }
+  @keyframes orbitSpark{
+    0%{transform:rotate(0) translate(0, -90px) rotate(0)}
+    100%{transform:rotate(360deg) translate(0, -90px) rotate(-360deg)}
+  }
+
+  /* button color themes */
+  .navBtn.shipsClr     .ring{ --c1:#aa66ff; }
+  .navBtn.bossClr      .ring{ --c1:#ff00aa; }
+  .navBtn.playClr      .ring{ --c1:#00d977; }
+  .navBtn.pvpClr       .ring{ --c1:#ff3366; }
+  .navBtn.shopClr      .ring{ --c1:#ffaa00; }
+  .navBtn.tutClr       .ring{ --c1:#aa66ff; }
+
+  @media (max-width:780px){
+    .navBtn .ring{width:64px; height:64px;}
+    .navBtn.big .ring{width:96px; height:96px;}
+    .navBtn .lbl{font-size:11px; letter-spacing:1px;}
+    .navBtn.big .lbl{font-size:14px;}
+    .navBtn.big::after{transform-origin:7px 35px; animation-name:orbitSparkSm}
+    @keyframes orbitSparkSm{
+      0%{transform:rotate(0) translate(0, -60px) rotate(0)}
+      100%{transform:rotate(360deg) translate(0, -60px) rotate(-360deg)}
+    }
+    .pilotBadge .xpbar{width:90px;}
+    .pilotBadge .name{font-size:12px;}
+    #hubSideL, #hubSideR{top:80px; gap:14px;}
+    .sideBtn{width:54px; height:54px; font-size:22px;}
+    .sideSlot .sideLbl{font-size:9px; padding:2px 8px;}
+    #hubHero canvas{width:220px; height:220px;}
+    #hubHero::before{width:240px;height:240px;}
+    #hubHero::after{width:200px;height:200px;}
+    #hubBottom{bottom:14px; gap:12px;}
+    #hubCenter{bottom:160px; top:14%;}
+  }
+
+  /* ===== Hub modal (settings/achievements/etc) ===== */
+  #hubModal{display:none; position:fixed; inset:0; background:#02030acc; backdrop-filter:blur(6px); z-index:50; align-items:center; justify-content:center; padding:20px;}
+  #hubModal.show{display:flex; animation:fadeIn .2s;}
+  #hubModalBox{position:relative; max-width:560px; width:100%; max-height:84vh; background:linear-gradient(180deg,#1a3a6a,#0a1a3a); border:4px solid #050a18; border-radius:18px; padding:22px 26px; box-shadow:0 8px 0 #050a18, 0 14px 40px #00000099, inset 0 2px 0 #ffffff22; overflow-y:auto; color:#cfe9ff;}
+  #hubModalBox h2{margin:0 0 12px; color:#ffea00; letter-spacing:6px; font-size:24px; text-shadow:0 2px 0 #050a18; text-align:center; font-weight:900;}
+  #hubModalBox h2 .ic{display:inline-block; margin-right:8px;}
+  #hubModalBox .close{position:absolute; top:10px; right:14px; width:36px; height:36px; border-radius:50%; background:linear-gradient(180deg,#ff3344,#aa1122); border:3px solid #050a18; color:#fff; font-size:18px; font-weight:900; cursor:pointer; box-shadow:0 3px 0 #050a18;}
+  #hubModalBox .close:hover{filter:brightness(1.2);}
+  #hubModalBox .row{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 12px; background:#050a18cc; border:2px solid #244a78; border-radius:10px; margin-bottom:8px;}
+  #hubModalBox .row .label{color:#9ec5ff; font-size:13px; letter-spacing:2px;}
+  #hubModalBox .row .val{color:#ffea00; font-weight:900; font-size:16px; text-shadow:0 1px 0 #050a18;}
+  #hubModalBox input[type=text]{flex:1; max-width:240px; background:#02030a; border:2px solid #244a78; border-radius:8px; padding:8px 12px; color:#fff; font-family:inherit; font-size:15px; letter-spacing:2px; font-weight:900; text-align:right;}
+  #hubModalBox input[type=text]:focus{outline:none; border-color:#00eaff; box-shadow:0 0 14px #00eaff66;}
+  #hubModalBox .toggle{display:inline-flex; align-items:center; gap:8px; cursor:pointer; user-select:none;}
+  #hubModalBox .toggle .swt{width:46px; height:24px; border-radius:14px; background:#244a78; border:2px solid #050a18; position:relative; transition:.2s;}
+  #hubModalBox .toggle .swt::after{content:""; position:absolute; left:2px; top:2px; width:16px; height:16px; border-radius:50%; background:#9ec5ff; transition:.2s; box-shadow:0 1px 2px #050a18;}
+  #hubModalBox .toggle.on .swt{background:#00d977;}
+  #hubModalBox .toggle.on .swt::after{left:24px; background:#fff;}
+  #hubModalBox .achv{display:flex; align-items:center; gap:10px; padding:10px 12px; border:2px solid #244a78; border-radius:10px; margin-bottom:6px; background:#050a1899;}
+  #hubModalBox .achv.locked{opacity:.4;}
+  #hubModalBox .achv .icon{font-size:22px;}
+  #hubModalBox .achv .info{flex:1;}
+  #hubModalBox .achv .name{color:#ffea00; font-weight:900; letter-spacing:2px; font-size:13px;}
+  #hubModalBox .achv .desc{color:#9ec5ff; font-size:11px; margin-top:2px;}
+  #hubModalBox .achv.unlocked{border-color:#ffea00; background:#1a3a6acc; box-shadow:0 0 14px #ffea0033;}
+  #hubModalBox .stats{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+  #hubModalBox .stat{padding:10px 12px; background:#050a18cc; border:2px solid #244a78; border-radius:10px; text-align:center;}
+  #hubModalBox .stat .num{color:#ffea00; font-weight:900; font-size:24px; text-shadow:0 2px 0 #050a18;}
+  #hubModalBox .stat .lbl{color:#9ec5ff; font-size:10px; letter-spacing:2px; margin-top:2px;}
+  #hubModalBox .modalBtn{display:block; width:100%; margin-top:10px; padding:10px; background:linear-gradient(180deg,#ff3344,#aa1122); border:3px solid #050a18; color:#fff; font-family:inherit; font-weight:900; letter-spacing:3px; border-radius:10px; cursor:pointer; box-shadow:0 4px 0 #050a18;}
+  #hubModalBox .modalBtn:hover{filter:brightness(1.2);}
+  #hubModalBox .modalBtn.primary{background:linear-gradient(180deg,#00d977,#00875a);}
+
+  /* portrait warning */
+  #rotateMsg{display:none;position:fixed;inset:0;background:#02030aee;color:#cfe9ff;align-items:center;justify-content:center;z-index:30;flex-direction:column;text-align:center;padding:20px;}
+  #rotateMsg .ic{font-size:60px;margin-bottom:14px;animation:rot 2s ease-in-out infinite;}
+  @keyframes rot{0%,100%{transform:rotate(0)}50%{transform:rotate(90deg)}}
+
+  /* ============================================================
+     PHONE-ONLY OVERRIDES
+     Applied via body.is-phone (set by JS in 01-core.js when the
+     viewport's smaller dimension is < 500px AND the device has
+     touch input). Tablets, narrow desktop windows, and large
+     foldables are deliberately NOT matched.
+     ============================================================ */
+
+  /* — Disable expensive paint effects on ALL touch devices (phones AND
+       tablets). backdrop-filter is the single biggest CSS perf killer on
+       iOS Safari, and stacked drop-shadow filters murder framerate on
+       Android tablets. Sized layout overrides stay phone-only below. — */
+  body.is-touch #overlay{backdrop-filter:none;-webkit-backdrop-filter:none;}
+  body.is-touch #hud .panel{backdrop-filter:none;-webkit-backdrop-filter:none;}
+  body.is-touch #hubHero canvas{filter:drop-shadow(0 4px 0 #050a18);}
+  body.is-touch #hubHero::before, body.is-touch #hubHero::after{display:none;}
+  body.is-touch .navBtn .ring::before{filter:blur(4px);}
+  /* Strip the rotating/orbiting decorative animations on touch — they
+     pin the GPU at 60fps even on the menu. */
+  body.is-touch .navBtn .ring::after{animation:none;opacity:.4;}
+  body.is-touch .sideBtn::after{animation:none;opacity:.4;}
+  body.is-touch #hubHero canvas{animation:none;}
+
+  /* Hide the orbiting "spark" on the big PLAY button for touch devices.
+     At smaller orbit radii the spark crashes into the button label below
+     ("PLA●Y"). Strictly decorative on desktop anyway. */
+  body.is-touch .navBtn.big::after{display:none;}
+
+  /* — HUD: tighter & smaller — */
+  body.is-phone #hud{font-size:10px;top:4px;left:4px;right:4px;}
+  body.is-phone #hud .panel{padding:4px 8px;border-radius:6px;}
+  body.is-phone #hud .label{font-size:8px;margin-bottom:1px;}
+  body.is-phone .heart{width:11px;height:9px;}
+  body.is-phone .pill{font-size:9px;padding:1px 6px;}
+  body.is-phone .fx{font-size:9px;padding:1px 4px;}
+  body.is-phone #combo{padding:4px 8px;font-size:10px;top:60px;right:6px;}
+  body.is-phone #combo .mult{font-size:14px;}
+  body.is-phone #combo .timer{width:60px;}
+  body.is-phone #minimap{display:none !important;}
+  body.is-phone #hudBottom{display:none !important;}
+  /* The keyboard-hint bar at the bottom of the screen is desktop-only;
+     it overlaps the touch controls on tablets. */
+  body.is-touch #hudBottom{display:none !important;}
+  body.is-phone #saveBar{font-size:10px;padding:4px 8px;gap:8px;}
+  body.is-phone #saveBar .coin{width:18px;height:18px;line-height:18px;font-size:9px;}
+  body.is-phone #bossBar{width:80%;top:46px;}
+  body.is-phone #bossBar .label{font-size:11px;letter-spacing:3px;}
+
+  /* — Title screens / dialogs — */
+  body.is-phone h1.title{font-size:30px;letter-spacing:4px;}
+  body.is-phone .subtitle{font-size:9px;letter-spacing:2px;margin:0 0 10px;}
+  body.is-phone .tagline{font-size:11px;line-height:1.4;margin:0 0 14px;}
+  body.is-phone .btn{padding:7px 12px;font-size:11px;letter-spacing:1px;}
+  body.is-phone .btn.primary{font-size:13px;padding:9px 16px;}
+  body.is-phone .btn.diff{min-width:130px;padding:10px 14px;font-size:13px;letter-spacing:2px;}
+  body.is-phone .btnCol{width:96vw;gap:7px;margin:6px 0;}
+
+  /* — Big "epic" buttons (boss-select, etc.) — */
+  body.is-phone .btnEpic{padding:8px 12px;gap:8px;border-radius:14px;border-width:3px;}
+  body.is-phone .btnEpic .ic{width:38px;height:38px;}
+  body.is-phone .btnEpic .ic::before{width:34px;height:34px;}
+  body.is-phone .btnEpic .ic canvas{width:38px !important;height:38px !important;}
+  body.is-phone .btnEpic .lbl .t{font-size:13px;letter-spacing:2px;}
+  body.is-phone .btnEpic .lbl .s{font-size:9px;letter-spacing:1px;margin-top:2px;}
+  body.is-phone .btnEpic .arrow{font-size:18px;}
+
+  /* — Hub layout (Bloons-style) — */
+  body.is-phone #hubTop{padding:6px 8px;}
+  body.is-phone .pilotBadge{padding:3px 10px 3px 3px;border-width:2px;}
+  body.is-phone .pilotBadge .lvl{width:28px;height:28px;font-size:13px;border-width:2px;}
+  body.is-phone .pilotBadge .name{font-size:10px;letter-spacing:1px;}
+  body.is-phone .pilotBadge .xpbar{width:70px;height:9px;}
+  body.is-phone .pilotBadge .xpwrap .num{font-size:9px;}
+  body.is-phone .shardBar{padding:3px 8px;border-width:2px;gap:5px;}
+  body.is-phone .shardBar .gem{width:20px;height:20px;font-size:10px;}
+  body.is-phone .shardBar .v{font-size:13px;}
+  body.is-phone .shardBar .plus{width:22px;height:22px;font-size:14px;line-height:18px;}
+  body.is-phone .eventRibbon{max-width:280px;padding:4px 18px 6px;}
+  body.is-phone .eventRibbon .t{font-size:10px;letter-spacing:2px;}
+  body.is-phone .eventRibbon .s{font-size:9px;letter-spacing:1px;}
+  body.is-phone #hubTitle{top:42px;}
+  body.is-phone .hubTitleText{font-size:26px;letter-spacing:4px;}
+  body.is-phone .hubTitleSub{font-size:9px;letter-spacing:3px;margin-top:2px;}
+  body.is-phone #hubCenter{top:88px;bottom:120px;}
+  body.is-phone #hubHero canvas{width:140px !important;height:140px !important;}
+  body.is-phone #hubBottom{bottom:8px;gap:8px;padding:0 4px;}
+  body.is-phone .navBtn .ring{width:50px;height:50px;border-width:3px;}
+  body.is-phone .navBtn.big .ring{width:74px;height:74px;}
+  body.is-phone .navBtn .lbl{font-size:9px;letter-spacing:1px;}
+  body.is-phone .navBtn.big .lbl{font-size:11px;letter-spacing:2px;}
+  body.is-phone .navBtn .ribbon{font-size:8px;padding:1px 6px;top:-9px;}
+  body.is-phone .navBtn.big::after{transform-origin:7px 28px;animation-name:orbitSparkPhone;}
+  @keyframes orbitSparkPhone{
+    0%{transform:rotate(0) translate(0, -52px) rotate(0)}
+    100%{transform:rotate(360deg) translate(0, -52px) rotate(-360deg)}
+  }
+  body.is-phone #hubSideL, body.is-phone #hubSideR{top:54px;gap:8px;}
+  body.is-phone .sideBtn{width:38px;height:38px;font-size:16px;border-width:3px;}
+  body.is-phone .sideBtn::before{inset:-6px;filter:blur(4px);}
+  body.is-phone .sideBtn::after{inset:-3px;border-width:1.5px;}
+  body.is-phone .sideSlot .sideLbl{font-size:8px;padding:1px 6px;border-width:2px;}
+  body.is-phone .sideBtn .badge{min-width:16px;height:16px;font-size:9px;line-height:13px;}
+  body.is-phone .sideBtn .tip{display:none;}
+
+  /* — Touch controls: tighter ergonomics for landscape phones — */
+  body.is-phone #stick{width:90px;height:90px;left:10px;bottom:10px;border-width:2px;}
+  body.is-phone #stick .nub{width:38px;height:38px;}
+  body.is-phone .tBtn.fire{width:74px;height:74px;line-height:74px;right:10px;bottom:10px;font-size:13px;}
+  body.is-phone .tBtn.ability{right:92px;bottom:42px;width:50px;height:50px;line-height:50px;font-size:11px;}
+  body.is-phone .tBtn.weapon{bottom:90px;right:10px;width:46px;height:46px;line-height:46px;font-size:9px;}
+  body.is-phone .tBtn.boost{left:106px;bottom:42px;width:50px;height:50px;line-height:50px;font-size:10px;}
+  body.is-phone .tBtn.pause{top:6px;right:6px;width:36px;height:36px;line-height:36px;font-size:11px;}
+  body.is-phone .tBtn.cons{width:34px;height:34px;line-height:34px;font-size:9px;}
+  body.is-phone #cons1{left:10px;top:108px;}
+  body.is-phone #cons2{left:48px;top:108px;}
+  body.is-phone #cons3{left:86px;top:108px;}
+
+  /* — Shop / modal sizing — */
+  body.is-phone #menuShop{width:98vw;max-height:96vh;}
+  body.is-phone #shopScroll{max-height:50vh;}
+  body.is-phone .item{padding:6px 8px;gap:6px;}
+  body.is-phone .item h3{font-size:12px;}
+  body.is-phone .item p{font-size:10px;}
+  body.is-phone .item .iconBox{width:40px;height:40px;}
+  body.is-phone .item .iconBox canvas{width:38px !important;height:38px !important;}
+  body.is-phone .item.skin canvas{width:70px !important;height:46px !important;}
+  body.is-phone .item .actions{min-width:74px;}
+  body.is-phone .item .actions .price{font-size:10px;}
+  body.is-phone .tabs{gap:3px;flex-wrap:wrap;justify-content:center;}
+  body.is-phone .tab{padding:5px 10px;font-size:10px;letter-spacing:1px;}
+  body.is-phone #hubModalBox{padding:14px 16px;border-width:3px;border-radius:14px;max-height:90vh;}
+  body.is-phone #hubModalBox h2{font-size:18px;letter-spacing:3px;margin:0 0 10px;}
+  body.is-phone #hubModalBox .row{padding:8px 10px;}
+  body.is-phone #hubModalBox .stats{grid-template-columns:1fr 1fr;gap:6px;}
+  body.is-phone #hubModalBox .stat .num{font-size:18px;}
+  body.is-phone #hubModalBox .stat .lbl{font-size:9px;}
+
+  /* — Tutorial captions — */
+  body.is-phone #tutCaption{font-size:11px;padding:7px 14px;max-width:90vw;top:60px;}
+  body.is-phone #tut .step{padding:10px 14px;margin:6px;max-width:90vw;}
+  body.is-phone #tut .step h3{font-size:13px;letter-spacing:2px;}
+  body.is-phone #tut .step p{font-size:11px;}
+
+  /* — Rotation hint: bigger, clearer on small phones — */
+  body.is-phone #rotateMsg{font-size:14px;line-height:1.4;}
+  body.is-phone #rotateMsg .ic{font-size:46px;margin-bottom:10px;}
+
+  /* ============================================================
+     PHONE — orientation fixes
+     The 3-panel HUD (HULL / PROGRESS / RESOURCES) overflows 390px
+     on either orientation of an iPhone-class screen — the center
+     "PROGRESS" panel is the worst offender (140px min-width + a
+     5-row stack of meta info). Hide it on phones; the round counter
+     gets folded into the left HULL panel as a tiny pill, and the
+     ability/weapon info is already visible on the touch buttons.
+     ============================================================ */
+  body.is-phone #hud > .panel:nth-child(2){ display:none; }
+  body.is-phone #hud > .panel:nth-child(1){ flex:0 0 auto; }
+  /* Right panel: drop the long RESOURCES label and "SCORE " prefix
+     so just the numbers remain. This prevents overflow on iPhone-class
+     viewports (390px wide) where "RESOURCES" + "SCORE 0" + "◈ 0" don't
+     fit alongside the HULL hearts. */
+  body.is-phone #hud > .panel:nth-child(3){
+    flex:0 0 auto;
+    font-size:10px;
+    max-width:80px;
+    overflow:hidden;
+    line-height:1.15;
+    margin-right:44px; /* clear the .tBtn.pause sitting at right:8px */
+  }
+  body.is-phone #hud > .panel:nth-child(3) .label,
+  body.is-phone #hud > .panel:nth-child(3) .lbl-prefix{ display:none; }
+  body.is-phone #hud > .panel:nth-child(3) > div{ font-size:12px; font-weight:900; }
+
+  /* Tablet (both orientations) — the right RESOURCES panel was creeping
+     under the touch pause button (which lives at top:14px right:14px,
+     50px wide) and clipping its label. Constrain its width and drop
+     the long labels so SCORE/credits stay readable next to the pause btn. */
+  body.is-tablet #hud > .panel:nth-child(3){
+    max-width:110px;
+    overflow:hidden;
+    margin-right:60px; /* clear the pause button on the right */
+  }
+  body.is-tablet #hud > .panel:nth-child(3) .label,
+  body.is-tablet #hud > .panel:nth-child(3) .lbl-prefix{ display:none; }
+  body.is-tablet #hud > .panel:nth-child(3) > div{
+    font-size:14px; font-weight:900;
+  }
+
+  /* ============================================================
+     PHONE-PORTRAIT — narrow viewport (typically 390x844).
+     - Smaller pilot badge so it doesn't overlap the side-icon column
+     - Side icon columns inset further
+     - Smaller bottom nav buttons so 6 buttons fit 390px wide
+     - Hub title centered with smaller font
+     ============================================================ */
+  body.is-phone.is-portrait .pilotBadge{padding:2px 8px 2px 2px;}
+  body.is-phone.is-portrait .pilotBadge .lvl{width:24px;height:24px;font-size:11px;}
+  body.is-phone.is-portrait .pilotBadge .name{font-size:9px;}
+  body.is-phone.is-portrait .pilotBadge .xpbar{width:54px;height:8px;}
+  body.is-phone.is-portrait .pilotBadge .xpwrap{display:none;} /* xp not critical in portrait */
+  body.is-phone.is-portrait #hubSideL{left:8px;top:78px;gap:6px;}
+  body.is-phone.is-portrait #hubSideR{right:8px;top:78px;gap:6px;}
+  body.is-phone.is-portrait .sideBtn{width:34px;height:34px;font-size:14px;}
+  body.is-phone.is-portrait .sideSlot .sideLbl{font-size:7px;padding:1px 5px;}
+
+  /* Bottom nav: 6 small icons + the big PLAY centerpiece must fit 390px.
+     Drop spacing further, shrink rings, narrower labels. */
+  body.is-phone.is-portrait #hubBottom{gap:4px;bottom:6px;}
+  body.is-phone.is-portrait .navBtn .ring{width:42px;height:42px;border-width:2px;}
+  body.is-phone.is-portrait .navBtn.big .ring{width:62px;height:62px;}
+  body.is-phone.is-portrait .navBtn .lbl{font-size:8px;letter-spacing:0.5px;}
+  body.is-phone.is-portrait .navBtn.big .lbl{font-size:10px;letter-spacing:1px;}
+  body.is-phone.is-portrait .navBtn .ribbon{font-size:7px;padding:1px 5px;top:-7px;}
+  body.is-phone.is-portrait .navBtn.big::after{transform-origin:7px 22px;animation-name:orbitSparkPhonePortrait;}
+  @keyframes orbitSparkPhonePortrait{
+    0%{transform:rotate(0) translate(0, -42px) rotate(0)}
+    100%{transform:rotate(360deg) translate(0, -42px) rotate(-360deg)}
+  }
+
+  /* Hub title — keep on one line in portrait */
+  body.is-phone.is-portrait .hubTitleText{font-size:22px;letter-spacing:3px;}
+  body.is-phone.is-portrait .hubTitleSub{font-size:8px;letter-spacing:2px;}
+  body.is-phone.is-portrait #hubTitle{top:38px;}
+  body.is-phone.is-portrait #hubCenter{top:80px;bottom:96px;}
+  body.is-phone.is-portrait #hubHero canvas{width:120px !important;height:120px !important;}
+
+  /* In-game touch controls in portrait — taller play area, lower button row */
+  body.is-phone.is-portrait #stick{left:8px;bottom:8px;}
+  body.is-phone.is-portrait .tBtn.fire{right:8px;bottom:8px;}
+  body.is-phone.is-portrait .tBtn.ability{right:90px;bottom:36px;}
+  body.is-phone.is-portrait .tBtn.weapon{bottom:88px;right:8px;}
+  body.is-phone.is-portrait .tBtn.boost{left:104px;bottom:36px;}
+
+  /* Eventribbon hidden in portrait (would compete with title) */
+  body.is-phone.is-portrait .eventRibbon{display:none;}
+
+  /* Tablet-portrait: VOID INCURSION ribbon collides with the saveBar on
+     the right. Shrink it and constrain max-width so it doesn't crowd
+     the corner gradient. Also tighten the title so HYPER SHARDS stays
+     on a single line at 768px. */
+  body.is-tablet.is-portrait .eventRibbon{
+    max-width:300px;
+    padding:5px 22px 8px;
+  }
+  body.is-tablet.is-portrait .eventRibbon .t{ font-size:11px; letter-spacing:3px; }
+  body.is-tablet.is-portrait .eventRibbon .s{ font-size:9px; }
+  body.is-tablet.is-portrait .hubTitleText{ font-size:42px; letter-spacing:8px; white-space:nowrap; }
+  body.is-tablet.is-portrait .hubTitleSub{ font-size:12px; letter-spacing:6px; }
+
+  /* ============================================================
+     DIFFICULTY / VS-AI SELECT — portrait polish
+     The default .btnRow lays out three .btn.diff side-by-side. On a
+     768px-tablet-portrait viewport that stacks-but-looks-small, with
+     a lot of wasted vertical space. Force a vertical column on touch
+     portrait, with larger, more tappable buttons.
+     ============================================================ */
+  body.is-touch.is-portrait #menuDiff .btnRow,
+  body.is-touch.is-portrait #menuPvp  .btnRow{
+    flex-direction:column;
+    align-items:stretch;
+    width:min(420px, 88vw);
+    margin:14px auto;
+    gap:12px;
+  }
+  /* exclude the BACK row at the bottom of the menu — only the
+     first .btnRow (the difficulty buttons) needs the column flip */
+  body.is-touch.is-portrait #menuDiff .btnRow:last-of-type,
+  body.is-touch.is-portrait #menuPvp  .btnRow:last-of-type{
+    flex-direction:row; width:auto; margin-top:18px;
+  }
+  body.is-touch.is-portrait .btn.diff{
+    min-width:0; width:100%;
+    padding:18px 22px;
+    font-size:18px; letter-spacing:5px;
+    text-align:center;
+  }
+  body.is-touch.is-portrait .btn.diff small{
+    font-size:13px; margin-top:6px;
+  }

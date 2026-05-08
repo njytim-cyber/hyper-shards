@@ -3,3 +3,8 @@
 *.log
 .DS_Store
 audio/original/
+
+# Playwright + screenshot artifacts (regenerable, large)
+test-results/
+playwright-report/
+test/_screenshots/

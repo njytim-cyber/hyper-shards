@@ -1,0 +1,16 @@
+{
+  "name": "hyper-shards",
+  "private": true,
+  "description": "Neon arcade space shooter — pure JS, no build step. See CLAUDE.md.",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "test:watch": "node --test --watch test/*.test.js",
+    "e2e": "playwright test",
+    "e2e:tablet": "playwright test --project=tablet",
+    "e2e:phone": "playwright test --project=phone",
+    "e2e:desktop": "playwright test --project=desktop"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.59.1"
+  }
+}
