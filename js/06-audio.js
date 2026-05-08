@@ -88,7 +88,7 @@ function setMusicMode(mode){
     return;
   }
   const def = MUSIC_TRACKS[mode];
-  const targetVol = music.enabled ? def.vol : 0;
+  const targetVol = music.enabled ? def.vol * _musicScale() : 0;
   if(prev) _fadeTo(prev, 0, music.fadeMs);
   music.current = next;
   if(music.enabled){
@@ -108,7 +108,7 @@ function playMusicSting(mode){
   const el = _ensureTrack(mode); if(!el || !music.enabled) return;
   try{
     el.currentTime = 0;
-    el.volume = MUSIC_TRACKS[mode].vol;
+    el.volume = MUSIC_TRACKS[mode].vol * _musicScale();
     const p = el.play();
     if(p && p.catch) p.catch(()=>{});
   }catch(e){}
@@ -120,10 +120,18 @@ function setMusicVolume(on){
   if(!cur) return;
   if(on){
     try{ if(cur.paused) cur.play(); }catch(e){}
-    _fadeTo(cur, MUSIC_TRACKS[music.mode].vol, 300);
+    _fadeTo(cur, MUSIC_TRACKS[music.mode].vol * _musicScale(), 300);
   } else {
     _fadeTo(cur, 0, 300);
   }
+}
+// Re-apply the user's music slider live (called from settings UI when
+// the slider moves). Skipping the work when no track is playing avoids
+// a NaN/0 fade that would unmute on the next mode change.
+function refreshMusicVolume(){
+  const cur = music.current;
+  if(!cur || !music.enabled) return;
+  cur.volume = MUSIC_TRACKS[music.mode].vol * _musicScale();
 }
 
 // Boot music on first user interaction (browsers block autoplay)
@@ -157,8 +165,17 @@ function sfx(type){
   o.type = type2;
   o.frequency.setValueAtTime(f0, t);
   o.frequency.exponentialRampToValueAtTime(Math.max(20,f1), t+dur);
-  g.gain.setValueAtTime(vol, t);
+  // Apply user's SFX volume slider on top of the per-effect base volume.
+  // 0–100 maps to 0.0–1.0; 70 (default) preserves the previous loudness.
+  const sfxScale = save && typeof save.sfxVol==='number' ? save.sfxVol/70 : 1;
+  g.gain.setValueAtTime(vol * sfxScale, t);
   g.gain.exponentialRampToValueAtTime(0.001, t+dur);
   o.start(t); o.stop(t+dur);
+}
+
+// Public helper for the music system to scale every volume by the user's
+// musicVol slider. Defaults to 1.0 so saves missing the field are silent.
+function _musicScale(){
+  return save && typeof save.musicVol==='number' ? save.musicVol/70 : 1;
 }
 

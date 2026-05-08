@@ -291,6 +291,7 @@ function update(dt){
     if(state.boss){
       if(Math.hypot(b.x-state.boss.x,b.y-state.boss.y) < state.boss.r){
         state.boss.hp -= b.dmg;
+        if(state.stats && b.shooter==='player') state.stats.shotsHit++;
         explode(b.x,b.y,b.col,4);
         if(b.cluster){ clusterSplit(b); b.life = 0; }
         else if(b.void){ spawnVoidWell(b.x,b.y); b.life = 0; }
@@ -301,6 +302,7 @@ function update(dt){
     }
     for(const e of state.enemies){
       if(Math.hypot(b.x-e.x,b.y-e.y) < e.r){
+        if(state.stats && b.shooter==='player' && b.life>0) state.stats.shotsHit++;
         let dmg = b.dmg;
         // shielded UFO: half damage until shield breaks
         if(e.type==='ufo' && e.shield>0){ dmg *= 0.5; if(b.dmg>=20) e.shield = 0; }
@@ -358,6 +360,8 @@ function update(dt){
       state.shake = Math.max(state.shake, e.r/8);
       const baseScore = e.type==='ufo' ? 40 : 15;
       state.score += baseScore;
+      if(state.stats) state.stats.kills++;
+      save.totalKills = (save.totalKills||0) + 1;
       comboKill(baseScore);
       sfx(e.r>40?'boom':'kill');
       if(e.r>40) state.hitStop = 30;
@@ -646,6 +650,7 @@ function damagePlayer(dmg){
   state.shake = Math.max(state.shake, 12);
   state.hitStop = 60;
   sfx('hurt');
+  haptic(40);
   // reset combo on damage
   state.combo.count = 0; state.combo.mult = 1; state.combo.timer = 0;
   // shockwave special
@@ -684,6 +689,7 @@ function damagePlayer(dmg){
     explode(player.x,player.y,player.skin.glow||'#fff',80,2);
     if(state.mode==='survival'){
       state.phase='dead';
+      haptic([100,60,140]);
       if(typeof setMusicMode==='function') setMusicMode('gameover');
       setTimeout(()=>{
         const title = state.bossArenaMode ? 'DEFEATED' : 'GAME OVER';
@@ -693,6 +699,28 @@ function damagePlayer(dmg){
           : `ROUND ${state.round} · SCORE ${state.score}`;
         document.getElementById('overSummary').textContent = summary;
         document.getElementById('overEarn').textContent = `+${state.earnedThisRun} ◈ shards earned`;
+        // Inject the per-run breakdown into the game-over screen. The
+        // stats node lives between the earn line and the button row;
+        // we recreate it each death so a fresh save schema doesn't
+        // need to ship the markup in index.html.
+        const st = state.stats || {};
+        const elapsedMs = Math.max(0, performance.now() - (st.runStart||performance.now()));
+        const m = Math.floor(elapsedMs/60000), s = Math.floor((elapsedMs%60000)/1000);
+        const acc = st.shotsFired ? Math.round(st.shotsHit/st.shotsFired*100) : 0;
+        let breakdown = document.getElementById('overBreakdown');
+        if(!breakdown){
+          breakdown = document.createElement('div');
+          breakdown.id = 'overBreakdown';
+          breakdown.className = 'overStats';
+          const earnEl = document.getElementById('overEarn');
+          earnEl.parentNode.insertBefore(breakdown, earnEl.nextSibling);
+        }
+        breakdown.innerHTML = `
+          <div class="row"><span class="k">KILLS</span>     <span class="v">${st.kills||0}</span></div>
+          <div class="row"><span class="k">ACCURACY</span>  <span class="v">${acc}%</span></div>
+          <div class="row"><span class="k">TIME</span>      <span class="v">${m}:${String(s).padStart(2,'0')}</span></div>
+          <div class="row"><span class="k">TOP STREAK</span><span class="v">×${st.maxCombo||0}</span></div>
+        `;
         showMenu('menuOver');
         hideHUD();
       }, 700);

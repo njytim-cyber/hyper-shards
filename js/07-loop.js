@@ -6,10 +6,15 @@ function comboKill(value=1){
   state.combo.timer = 3500;
   state.combo.killTime = performance.now();
   const c = state.combo.count;
+  const prevMult = state.combo.mult;
   state.combo.mult = c>=50?8 : c>=25?4 : c>=10?2 : 1;
+  if(state.stats && c > (state.stats.maxCombo||0)) state.stats.maxCombo = c;
   if(c===10) achievement('STREAK MASTER');
   if(c===25) achievement('UNSTOPPABLE');
   if(c===50) achievement('LEGENDARY KILL CHAIN');
+  // Tactile bump every time the multiplier ticks up — gives the
+  // 10/25/50-streak milestones an analog "kick" beyond the SFX.
+  if(state.combo.mult !== prevMult && typeof haptic==='function') haptic(20);
   state.score += value * state.combo.mult;
   sfx('combo');
 }

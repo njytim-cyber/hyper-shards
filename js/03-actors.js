@@ -252,6 +252,10 @@ function fire(p, weapon, opts={}){
   let cdMul = p.fireMul;
   if(state.fx.rapid>0 && p===player) cdMul *= 0.45;
   p.cd = w.cd * cdMul;
+  // Track shots-fired for end-of-run accuracy. One trigger pull counts
+  // as one shot, regardless of multishot/spread/cluster — we want the
+  // ratio of "tap to register a hit somewhere" not "bullets in flight."
+  if(p===player && state.stats) state.stats.shotsFired++;
   let dmg = w.dmg * (p.dmgMul||1);
   if(state.fx.dmg>0 && p===player) dmg *= 2;
   if(p===player && p.fxBerserk>0) dmg *= 2;

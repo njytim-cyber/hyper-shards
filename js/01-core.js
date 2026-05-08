@@ -74,6 +74,12 @@ const defaultSave = () => ({
   pvpLosses: 0,
   audio: true,
   music: true,
+  // 0–100 volume sliders. Mute is still controlled by audio/music bools
+  // (kept for backward compat with the toggle UI); these scale the
+  // un-muted volume. Default 70 ≈ the previous baseline.
+  sfxVol: 70,
+  musicVol: 70,
+  haptics: true,
   upgrades: {
     dmg:0, fire:0, hp:0, speed:0, shield:0, magnet:0, multishot:0,
     boost:0, crit:0, pierce:0, lifesteal:0, luck:0, dodge:0
@@ -119,6 +125,21 @@ function safeLSGet(key){
 }
 function safeLSSet(key, val){
   try{ localStorage.setItem(key, val); return true; }catch(e){ return false; }
+}
+
+// ============================================================
+// HAPTICS
+// ============================================================
+// Light tactile feedback on touch devices. Gated by save.haptics so the
+// player can switch it off in settings; gated by isTouch so we don't ask
+// desktops about Vibration API quirks. `pattern` is a number (single
+// pulse, ms) or an array (alternating on/off, ms) per the W3C spec.
+function haptic(pattern){
+  if(!isTouch) return;
+  if(save && save.haptics === false) return;
+  try{
+    if(navigator.vibrate) navigator.vibrate(pattern);
+  }catch(e){ /* some browsers throw on rapid calls */ }
 }
 
 // ============================================================

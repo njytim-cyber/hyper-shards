@@ -5,7 +5,32 @@
       "PowerShell(Start-Sleep -Milliseconds 800; try { \\(Invoke-WebRequest -Uri 'http://127.0.0.1:8000/' -UseBasicParsing -TimeoutSec 2\\).StatusCode } catch { $_.Exception.Message })",
       "PowerShell(Start-Sleep -Milliseconds 700; try { \\(Invoke-WebRequest -Uri 'http://127.0.0.1:8000/' -UseBasicParsing -TimeoutSec 2\\).StatusCode } catch { $_.Exception.Message })",
       "PowerShell(npm install -g firebase-tools 2>&1)",
-      "PowerShell(& \"C:\\\\Program Files\\\\nodejs\\\\npm.cmd\" install -g firebase-tools 2>&1)"
+      "PowerShell(& \"C:\\\\Program Files\\\\nodejs\\\\npm.cmd\" install -g firebase-tools 2>&1)",
+      "Bash(ffmpeg -version)",
+      "PowerShell(winget install --id=Gyan.FFmpeg -e --accept-package-agreements --accept-source-agreements --silent)",
+      "PowerShell($env:Path = [System.Environment]::GetEnvironmentVariable\\(\"Path\",\"Machine\"\\) + \";\" + [System.Environment]::GetEnvironmentVariable\\(\"Path\",\"User\"\\); ffmpeg -version 2>&1 | Select-Object -First 1)",
+      "Bash(git commit -m ' *)",
+      "PowerShell($src = \"c:\\\\Users\\\\Admin\\\\Desktop\\\\Antigravity\\\\Code-Folders\\\\hyper-shards-2\\\\index.html\"; $dst = \"c:\\\\Users\\\\Admin\\\\Desktop\\\\Antigravity\\\\Code-Folders\\\\hyper-shards-2\\\\css\\\\style.css\"; $lines = [System.IO.File]::ReadAllLines\\($src\\); $css = $lines[9..699] -join \"`r`n\"; [System.IO.File]::WriteAllText\\($dst, $css, [System.Text.UTF8Encoding]::new\\($false\\)\\); Write-Output \\(\"Wrote {0} lines to style.css\" -f \\($lines[9..699].Count\\)\\))",
+      "PowerShell($lines = [System.IO.File]::ReadAllLines\\(\"c:\\\\Users\\\\Admin\\\\Desktop\\\\Antigravity\\\\Code-Folders\\\\hyper-shards-2\\\\index.html\"\\); for \\($i=10; $i -lt 17; $i++\\) { Write-Output \\(\"L{0}: {1}\" -f \\($i+1\\), $lines[$i]\\) })",
+      "Bash(node --check)",
+      "Bash(npx --yes http-server -p 8765 -s)",
+      "Bash(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8765__TRACKED_VAR__)",
+      "Bash(node -e ' *)",
+      "Bash(node --test test/boot-smoke.test.js)",
+      "Bash(grep -v \"= \\(\\\\\\\\|= function\\\\\\\\|=>\")",
+      "Bash(node --test test/)",
+      "Bash(node --test test/*.test.js)",
+      "Bash(npm test *)",
+      "PowerShell($f = \"c:\\\\Users\\\\Admin\\\\Desktop\\\\Antigravity\\\\Code-Folders\\\\hyper-shards-2\\\\js\\\\11-render.js\"; $lines = [System.IO.File]::ReadAllLines\\($f\\); $before = $lines[0..509]; $after = $lines[662..\\($lines.Count-1\\)]; $marker = @\\('// \\(dead drawShopIcon block removed — superseded by the dispatcher in 12-icons.js\\)',''\\); $new = $before + $marker + $after; [System.IO.File]::WriteAllLines\\($f, $new, [System.Text.UTF8Encoding]::new\\($false\\)\\); Write-Output \\(\"11-render.js: {0} lines \\(was {1}\\)\" -f $new.Count, $lines.Count\\))",
+      "Bash(npx --no-install playwright --version)",
+      "Bash(npm install *)",
+      "Bash(npm uninstall *)",
+      "Bash(npx playwright *)",
+      "Bash(npm run *)",
+      "Bash(rm -rf test/_screenshots)",
+      "Bash(mkdir -p test/_screenshots)",
+      "Bash(git ls-tree *)",
+      "Bash(sort -k4 -n -r)"
     ]
   }
 }

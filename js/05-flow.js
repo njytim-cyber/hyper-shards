@@ -15,6 +15,9 @@ function startSurvival(diff){
     blackHole:null, beam:null, decoy:null, acidCloud:null,
     solarSun:null, drones:null, voidWells:null, hitStop:0,
     combo:{count:0,timer:0,mult:1,killTime:0},
+    // Per-run stats — surfaced on the game-over screen so the player
+    // sees more than a bare score after a long session.
+    stats:{ kills:0, shotsFired:0, shotsHit:0, maxCombo:0, runStart:performance.now() },
   });
   if(typeof resetKeys==='function') resetKeys();
   player = makePlayer();

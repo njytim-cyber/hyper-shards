@@ -261,6 +261,22 @@
   /* Toast */
   #toast{position:fixed;bottom:60px;left:50%;transform:translateX(-50%);background:#0a1430ee;border:1px solid #00eaff;color:#cfe9ff;padding:8px 16px;border-radius:6px;opacity:0;transition:.3s;pointer-events:none;font-size:13px;letter-spacing:2px;z-index:20;}
 
+  /* Game-over per-run breakdown — kills/accuracy/time/streak. Injected
+     by 08-update.js into #menuOver between the "earned" line and the
+     button row. Two-column grid; muted labels, gold values. */
+  .overStats{
+    display:grid; grid-template-columns:1fr 1fr; gap:6px 28px;
+    margin:14px 0 18px; min-width:300px;
+    font-family:inherit; letter-spacing:2px; font-weight:900;
+  }
+  .overStats .row{display:flex; justify-content:space-between; padding:5px 12px; background:#050a18cc; border:1px solid #244a78; border-radius:8px;}
+  .overStats .k{color:#7ea8d4; font-size:11px;}
+  .overStats .v{color:#ffea00; font-size:14px; text-shadow:0 1px 0 #050a18;}
+  body.is-phone .overStats{min-width:0; width:90vw; gap:4px 10px; margin:8px 0 12px;}
+  body.is-phone .overStats .row{padding:4px 8px;}
+  body.is-phone .overStats .k{font-size:9px;}
+  body.is-phone .overStats .v{font-size:12px;}
+
   /* Update-available pill — shown when boot index.html differs from the
      currently-served one. Persistent (no auto-hide) and clickable so the
      player can finish a run before refreshing. Sits above #overlay so the
@@ -844,6 +860,32 @@
   #hubModalBox .row .val{color:#ffea00; font-weight:900; font-size:16px; text-shadow:0 1px 0 #050a18;}
   #hubModalBox input[type=text]{flex:1; max-width:240px; background:#02030a; border:2px solid #244a78; border-radius:8px; padding:8px 12px; color:#fff; font-family:inherit; font-size:15px; letter-spacing:2px; font-weight:900; text-align:right;}
   #hubModalBox input[type=text]:focus{outline:none; border-color:#00eaff; box-shadow:0 0 14px #00eaff66;}
+  /* Volume slider row in settings — keeps the slider centred between
+     the label and the live numeric badge. WebKit thumb is custom-styled
+     so the slider matches the neon button language. */
+  #hubModalBox .volRow input[type=range]{
+    flex:1; max-width:200px; min-width:120px;
+    -webkit-appearance:none; appearance:none;
+    height:6px; border-radius:3px;
+    background:linear-gradient(90deg,#00eaff 0%,#3a8acc 100%);
+    outline:none;
+  }
+  #hubModalBox .volRow input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; appearance:none;
+    width:18px; height:18px; border-radius:50%;
+    background:radial-gradient(circle at 30% 25%, #ffffff, #ffea00 60%);
+    border:2px solid #050a18;
+    box-shadow:0 2px 0 #050a18, 0 0 10px #ffea0066;
+    cursor:pointer;
+  }
+  #hubModalBox .volRow input[type=range]::-moz-range-thumb{
+    width:18px; height:18px; border-radius:50%;
+    background:radial-gradient(circle at 30% 25%, #ffffff, #ffea00 60%);
+    border:2px solid #050a18;
+    box-shadow:0 2px 0 #050a18, 0 0 10px #ffea0066;
+    cursor:pointer;
+  }
+  #hubModalBox .volRow .val{min-width:34px; text-align:right;}
   #hubModalBox .toggle{display:inline-flex; align-items:center; gap:8px; cursor:pointer; user-select:none;}
   #hubModalBox .toggle .swt{width:46px; height:24px; border-radius:14px; background:#244a78; border:2px solid #050a18; position:relative; transition:.2s;}
   #hubModalBox .toggle .swt::after{content:""; position:absolute; left:2px; top:2px; width:16px; height:16px; border-radius:50%; background:#9ec5ff; transition:.2s; box-shadow:0 1px 2px #050a18;}

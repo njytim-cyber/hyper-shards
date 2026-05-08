@@ -400,9 +400,23 @@ document.getElementById('hubBtnSettings').onclick = ()=>{
       <span class="label">SOUND EFFECTS</span>
       <div class="toggle ${save.audio?'on':''}" id="optAudio"><div class="swt"></div><span>${save.audio?'ON':'OFF'}</span></div>
     </div>
+    <div class="row volRow">
+      <span class="label">SFX VOLUME</span>
+      <input type="range" id="optSfxVol" min="0" max="100" step="5" value="${save.sfxVol|0}" />
+      <span class="val" id="optSfxVolNum">${save.sfxVol|0}</span>
+    </div>
     <div class="row">
       <span class="label">MUSIC</span>
       <div class="toggle ${save.music?'on':''}" id="optMusic"><div class="swt"></div><span>${save.music?'ON':'OFF'}</span></div>
+    </div>
+    <div class="row volRow">
+      <span class="label">MUSIC VOLUME</span>
+      <input type="range" id="optMusicVol" min="0" max="100" step="5" value="${save.musicVol|0}" />
+      <span class="val" id="optMusicVolNum">${save.musicVol|0}</span>
+    </div>
+    <div class="row">
+      <span class="label">HAPTICS</span>
+      <div class="toggle ${save.haptics?'on':''}" id="optHaptics"><div class="swt"></div><span>${save.haptics?'ON':'OFF'}</span></div>
     </div>
     <div class="row">
       <span class="label">CREDITS</span>
@@ -425,6 +439,32 @@ document.getElementById('hubBtnSettings').onclick = ()=>{
     save.music = !save.music;
     e.currentTarget.classList.toggle('on', save.music);
     e.currentTarget.querySelector('span').textContent = save.music?'ON':'OFF';
+    if(typeof setMusicVolume==='function') setMusicVolume(save.music);
+    persist();
+  };
+  // Volume sliders — live-apply so the player can hear/feel the level
+  // before committing. The numeric badge mirrors the slider value.
+  const sfxSlider = document.getElementById('optSfxVol');
+  const sfxNum = document.getElementById('optSfxVolNum');
+  sfxSlider.oninput = ()=>{
+    save.sfxVol = sfxSlider.valueAsNumber|0;
+    sfxNum.textContent = save.sfxVol;
+    persist();
+    sfx('hit'); // audible preview at the new level
+  };
+  const musSlider = document.getElementById('optMusicVol');
+  const musNum = document.getElementById('optMusicVolNum');
+  musSlider.oninput = ()=>{
+    save.musicVol = musSlider.valueAsNumber|0;
+    musNum.textContent = save.musicVol;
+    persist();
+    if(typeof refreshMusicVolume==='function') refreshMusicVolume();
+  };
+  document.getElementById('optHaptics').onclick = (e)=>{
+    save.haptics = !save.haptics;
+    e.currentTarget.classList.toggle('on', save.haptics);
+    e.currentTarget.querySelector('span').textContent = save.haptics?'ON':'OFF';
+    if(save.haptics && typeof haptic==='function') haptic(20); // preview pulse
     persist();
   };
   document.getElementById('optSave').onclick = ()=>{
