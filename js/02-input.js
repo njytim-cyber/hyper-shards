@@ -44,36 +44,71 @@ function setupTouch(){
   document.getElementById('touch').classList.add('on');
   document.getElementById('hudBottom').style.display = 'none';
 
-  // Joystick
+  // Floating-origin joystick.
+  // The visible pad at left:edge bottom:edge is the "rest" position; any
+  // touch that starts in the LEFT HALF of the screen (and isn't on a
+  // tBtn) re-centres the pad to the touch point and uses that as the
+  // origin. This is more forgiving than a fixed pad — the player doesn't
+  // have to look at their thumb, and one-handed grips that don't reach
+  // the corner still work. Releases snap the pad back to its rest spot.
   const stick = document.getElementById('stick');
   const nub = stick.querySelector('.nub');
   let stickActive = false, stickId = null, sx0=0, sy0=0;
   const stickRadius = 50;
+  // Cache the rest position so we can restore on release. Computed once
+  // so a window resize that re-flows the layout still hits the new spot
+  // (which is fine — getBoundingClientRect re-reads on the next press).
+  function stickRestRect(){ return stick.getBoundingClientRect(); }
   function setStick(dx, dy){
     const len = Math.hypot(dx,dy);
     if(len > stickRadius){ dx = dx/len*stickRadius; dy = dy/len*stickRadius; }
     nub.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
-    // map to keys
     const ax = dx/stickRadius, ay = dy/stickRadius;
     keys['a'] = ax < -0.25;
     keys['d'] = ax >  0.25;
     keys['w'] = ay < -0.25;
     keys['s'] = ay >  0.25;
   }
+  function placeStickAt(cx, cy){
+    // Re-anchor the visible pad. Use !important via inline style to
+    // override the calc() positioning from CSS.
+    const r = stick.getBoundingClientRect();
+    stick.style.left   = (cx - r.width/2) + 'px';
+    stick.style.top    = (cy - r.height/2) + 'px';
+    stick.style.right  = 'auto';
+    stick.style.bottom = 'auto';
+    stick.classList.add('floating');
+    sx0 = cx; sy0 = cy;
+  }
+  function returnStickToRest(){
+    stick.style.left = '';
+    stick.style.top = '';
+    stick.style.right = '';
+    stick.style.bottom = '';
+    stick.classList.remove('floating');
+  }
   function resetStick(){
     nub.style.transform = `translate(-50%,-50%)`;
     keys['a']=keys['d']=keys['w']=keys['s']=false;
+    returnStickToRest();
   }
-  // Joystick events — touchstart on the stick, but move/end on the
-  // document so dragging the finger off the visible pad keeps tracking
-  // (otherwise the keys lock at whatever direction the finger left in).
-  stick.addEventListener('touchstart', (e)=>{
-    e.preventDefault();
+  // Document-level touchstart so the entire left half is a "wake the
+  // stick" hot zone. We skip if the press lands on an interactive
+  // element (a tBtn) or in the right half of the screen, since those
+  // belong to fire/ability/weapon/cons.
+  document.addEventListener('touchstart', (e)=>{
+    if(stickActive) return;
+    if(state.phase!=='play' && state.phase!=='pvp' && state.phase!=='tutorial') return;
     const t = e.changedTouches[0];
+    if(t.clientX > window.innerWidth * 0.5) return;
+    // Don't hijack taps that landed on a button (fire/ability/etc. live
+    // bottom-right but cons buttons live top-left — the closest()-walk
+    // covers anything wired with tBtn).
+    if(e.target && e.target.closest && e.target.closest('.tBtn')) return;
+    e.preventDefault();
     stickActive = true; stickId = t.identifier;
-    const r = stick.getBoundingClientRect();
-    sx0 = r.left + r.width/2; sy0 = r.top + r.height/2;
-    setStick(t.clientX-sx0, t.clientY-sy0);
+    placeStickAt(t.clientX, t.clientY);
+    setStick(0, 0);
   }, {passive:false});
   document.addEventListener('touchmove', (e)=>{
     if(!stickActive) return;

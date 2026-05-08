@@ -365,6 +365,15 @@
   body.is-phone #stick{width:120px;height:120px;}
   body.is-phone #stick .nub{width:54px;height:54px;}
 
+  /* Floating state — the stick has been re-anchored to wherever the
+     player first touched. Brighten the border so it reads as "active"
+     instead of looking like a duplicate pad has appeared. */
+  #stick.floating{
+    border-color:#66ccffcc;
+    box-shadow:0 6px 0 #050a18aa, 0 0 32px #00eaff66, inset 0 0 30px #00eaff22;
+    transition:none;
+  }
+
   /* — Generic button base — */
   .tBtn{
     position:absolute; padding:0; pointer-events:auto;
