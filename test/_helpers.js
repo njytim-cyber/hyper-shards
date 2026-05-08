@@ -26,7 +26,7 @@ function makeStubElement(tag = 'div', id = '') {
   const el = {
     tagName: tag.toUpperCase(),
     id,
-    style: new Proxy({}, { get: (t, k) => t[k], set: (t, k, v) => { t[k] = v; return true; } }),
+    style: new Proxy({ setProperty(k, v){ this[k] = v; }, removeProperty(k){ delete this[k]; }, getPropertyValue(k){ return this[k] ?? ''; } }, { get: (t, k) => t[k], set: (t, k, v) => { t[k] = v; return true; } }),
     classList,
     children: [],
     dataset: {},

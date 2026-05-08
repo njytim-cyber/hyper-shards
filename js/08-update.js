@@ -467,7 +467,9 @@ function update(dt){
   updateHud();
 }
 
-let _hudCache = { hp:-1, maxHp:-1, score:-1, credits:-1, ammo:'', round:'', skinId:'', abilityName:'', abilityPct:-1, fxKey:'', fxBarHTML:'' };
+let _hudCache = { hp:-1, maxHp:-1, score:-1, credits:-1, ammo:'', round:'', skinId:'', abilityName:'', abilityPct:-1, fxKey:'', fxBarHTML:'',
+  cdAbility:-1, fuelBoost:-1, abReady:-1,
+  consHeal:-1, consShield:-1, consBomb:-1 };
 let _hudThrottle = 0;
 // Cached DOM nodes — getElementById in a 15Hz HUD path is cheap-but-not-
 // free (~0.05ms each on midrange hardware × 8 nodes × 15Hz = ~6ms/sec
@@ -485,6 +487,14 @@ function _ensureHudEls(){
     fxBar:  document.getElementById('fxBar'),
     abName: document.getElementById('abilityName'),
     abBar:  document.getElementById('abilityBar'),
+    // Touch-control dynamic state targets (cooldown ring, fuel ring,
+    // consumable count badges). Resolved once and cached so the 15Hz
+    // tick doesn't pay 6 getElementByIds.
+    tAbility: document.getElementById('tAbility'),
+    tBoost:   document.getElementById('tBoost'),
+    cons1: document.getElementById('cons1'), cons1Ct: document.getElementById('cons1Ct'),
+    cons2: document.getElementById('cons2'), cons2Ct: document.getElementById('cons2Ct'),
+    cons3: document.getElementById('cons3'), cons3Ct: document.getElementById('cons3Ct'),
   };
   return _hudEls;
 }
@@ -556,6 +566,50 @@ function updateHud(){
         ? 'linear-gradient(90deg,#ffea00,#00ffaa)'
         : 'linear-gradient(90deg,#3a8acc,#1a4a7a)';
     }
+    // Mirror to the touch ability button: --cd drives the conic-gradient
+    // ring (0–100), data-ready flips the pulse animation when off cooldown.
+    if($.tAbility){
+      if(_hudCache.cdAbility !== pctBucket){
+        _hudCache.cdAbility = pctBucket;
+        $.tAbility.style.setProperty('--cd', pctBucket);
+      }
+      const r = ready ? '1' : '0';
+      if(_hudCache.abReady !== r){
+        _hudCache.abReady = r;
+        $.tAbility.dataset.ready = r;
+      }
+    }
+  }
+  // Boost fuel ring — same pattern. boostMax depends on upgrades; recompute
+  // here rather than caching since save.upgrades.boost changes only on
+  // shop purchases (rare) and the cost is one mul + one add.
+  if($.tBoost){
+    const boostMax = 100 + 25*save.upgrades.boost;
+    const fuelPct = Math.round((player.boostFuel||0)/boostMax*100);
+    if(_hudCache.fuelBoost !== fuelPct){
+      _hudCache.fuelBoost = fuelPct;
+      $.tBoost.style.setProperty('--fuel', fuelPct);
+    }
+  }
+  // Consumable count badges + empty-state dimming. Skipping work when
+  // counts haven't changed avoids touching three buttons every 60ms.
+  const heal = save.consumables.heal|0;
+  const shield = save.consumables.shield|0;
+  const bomb = save.consumables.bomb|0;
+  if(_hudCache.consHeal !== heal && $.cons1Ct){
+    _hudCache.consHeal = heal;
+    $.cons1Ct.textContent = heal;
+    if($.cons1) $.cons1.dataset.empty = heal>0 ? '0' : '1';
+  }
+  if(_hudCache.consShield !== shield && $.cons2Ct){
+    _hudCache.consShield = shield;
+    $.cons2Ct.textContent = shield;
+    if($.cons2) $.cons2.dataset.empty = shield>0 ? '0' : '1';
+  }
+  if(_hudCache.consBomb !== bomb && $.cons3Ct){
+    _hudCache.consBomb = bomb;
+    $.cons3Ct.textContent = bomb;
+    if($.cons3) $.cons3.dataset.empty = bomb>0 ? '0' : '1';
   }
 }
 function makeHeart(filled){

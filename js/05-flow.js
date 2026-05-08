@@ -106,8 +106,23 @@ function openShop(midRun){
   showMenu('menuShop');
   renderShop();
 }
+// Currency displays live in three places — the shop subtitle, the
+// floating saveBar (top-right while in menus), and the hub shardBar
+// (visible on the main hub). A purchase only re-rendered the shop
+// subtitle, so the saveBar/hub bar stayed stale until the player exited
+// the shop. Sync them all in one pass so any save.credits mutation can
+// reflect immediately.
+function syncCurrencyDisplays(){
+  const sb = document.getElementById('sbCredits');
+  if(sb) sb.textContent = save.credits;
+  const sbBest = document.getElementById('sbBest');
+  if(sbBest) sbBest.textContent = save.best;
+  const hs = document.getElementById('hubShards');
+  if(hs) hs.textContent = save.credits;
+}
 function renderShop(){
   document.getElementById('shopCredits').textContent = save.credits;
+  syncCurrencyDisplays();
   const grid = document.getElementById('shopGrid');
   grid.innerHTML = '';
   const iconBox = ()=> '<div class="iconBox"><canvas width="60" height="60"></canvas></div>';

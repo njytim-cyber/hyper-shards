@@ -294,29 +294,176 @@
   #pvpScore .you{color:#00eaff;}
   #pvpScore .ai{color:#ff66cc;}
 
-  /* ===== Touch controls ===== */
-  #touch{position:fixed;inset:0;pointer-events:none;display:none;z-index:8;}
-  #touch.on{display:block;}
-  #stick{position:absolute;left:30px;bottom:30px;width:140px;height:140px;border-radius:50%;background:#0a1430aa;border:2px solid #3a8acc88;pointer-events:auto;touch-action:none;}
-  #stick .nub{position:absolute;left:50%;top:50%;width:60px;height:60px;border-radius:50%;background:#3a8accaa;border:2px solid #00eaff;transform:translate(-50%,-50%);box-shadow:0 0 18px #00eaff66;}
-  .tBtn{position:absolute;width:80px;height:80px;border-radius:50%;background:#0a1430cc;border:2px solid #3a8acc;color:#cfe9ff;font-weight:900;letter-spacing:2px;font-size:14px;text-align:center;line-height:80px;pointer-events:auto;touch-action:none;user-select:none;-webkit-user-select:none;text-shadow:0 0 6px #00eaff;font-family:inherit;
-    /* SVG-icon variant — when the button has an <svg> child it needs
-       flex centering instead of line-height. The line-height is kept
-       above for the text fallbacks (cons buttons still use glyphs). */
-    padding:0;
+  /* ============================================================
+     TOUCH CONTROLS — single source of truth.
+     Sizes are CSS vars so phone/tablet/desktop scale uniformly. All
+     buttons share a base style so the on-screen control surface reads
+     as one HUD instead of seven mismatched circles. Per-role accent
+     colors come through `--c1`; cooldown/fuel rings are conic-gradient
+     overlays driven by `--cd` / `--fuel` (0–100), set from JS each
+     tick. Buttons honour `env(safe-area-inset-*)` so notched phones
+     don't hide a tap edge. ============================================================ */
+  body.is-touch{
+    --tbtn-prim:104px;       /* fire — biggest, primary action */
+    --tbtn-sec:72px;         /* ability / boost — secondary */
+    --tbtn-ter:52px;         /* weapon / pause / cons — tertiary */
+    --tbtn-edge:14px;        /* gutter from viewport edge */
+    --tbtn-gap:14px;         /* gap between cluster siblings */
   }
-  .tBtn svg{display:block;margin:auto;filter:drop-shadow(0 0 4px currentColor);}
-  .tBtn:has(svg){display:flex;align-items:center;justify-content:center;line-height:0;}
-  .tBtn:active,.tBtn.held{transform:scale(0.92);box-shadow:0 0 22px #00eaff;background:#1a4a7acc;}
-  .tBtn.fire{right:30px;bottom:30px;width:110px;height:110px;line-height:110px;font-size:18px;border-color:#ffea00;color:#ffea00;text-shadow:0 0 8px #ffea00;}
-  .tBtn.ability{right:155px;bottom:75px;border-color:#ff66cc;color:#ff66cc;text-shadow:0 0 8px #ff66cc;}
-  .tBtn.weapon{right:30px;bottom:160px;width:64px;height:64px;line-height:64px;font-size:11px;}
-  .tBtn.boost{left:200px;bottom:75px;width:64px;height:64px;line-height:64px;font-size:11px;border-color:#00ffaa;color:#00ffaa;}
-  .tBtn.pause{top:14px;right:14px;width:50px;height:50px;line-height:50px;font-size:14px;}
-  .tBtn.cons{position:absolute;width:50px;height:50px;line-height:50px;font-size:11px;}
-  #cons1{left:30px;top:140px;border-color:#00ffaa;color:#00ffaa;}
-  #cons2{left:90px;top:140px;border-color:#ffea00;color:#ffea00;}
-  #cons3{left:150px;top:140px;border-color:#ff9933;color:#ff9933;}
+  body.is-tablet.is-portrait{ --tbtn-prim:96px; --tbtn-sec:68px; --tbtn-ter:48px; }
+  body.is-phone{
+    --tbtn-prim:84px;
+    --tbtn-sec:60px;
+    --tbtn-ter:44px;
+    --tbtn-edge:10px;
+    --tbtn-gap:10px;
+  }
+  body.is-phone.is-portrait{ --tbtn-prim:88px; --tbtn-sec:60px; --tbtn-ter:44px; }
+
+  #touch{position:fixed;inset:0;pointer-events:none;display:none;z-index:8;
+    /* Inset everything by the device safe-area so notch/home-indicator
+       don't eat tap targets. Children use percent + edge vars on top. */
+    padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+  #touch.on{display:block;}
+
+  /* Joystick — large enough for a thumb at any device, with a wider
+     "track" border so the centre/edge contrast is clear. */
+  #stick{
+    position:absolute;
+    left:calc(env(safe-area-inset-left) + var(--tbtn-edge));
+    bottom:calc(env(safe-area-inset-bottom) + var(--tbtn-edge));
+    width:140px; height:140px; border-radius:50%;
+    background:radial-gradient(circle at 30% 25%, #0a2a4acc, #050a18cc 70%);
+    border:3px solid #3a8acc66;
+    box-shadow:0 6px 0 #050a18aa, 0 8px 22px #00000077, inset 0 0 30px #00000055;
+    pointer-events:auto; touch-action:none;
+  }
+  #stick .nub{
+    position:absolute; left:50%; top:50%; width:62px; height:62px; border-radius:50%;
+    background:radial-gradient(circle at 30% 22%, #66ccff, #1a4a7a 70%);
+    border:2px solid #66ccff; transform:translate(-50%,-50%);
+    box-shadow:0 4px 0 #050a18, 0 0 22px #00eaff88, inset 0 -6px 10px #00000077, inset 0 4px 8px #ffffff44;
+    transition:background .15s;
+  }
+  body.is-phone #stick{width:120px;height:120px;}
+  body.is-phone #stick .nub{width:54px;height:54px;}
+
+  /* — Generic button base — */
+  .tBtn{
+    position:absolute; padding:0; pointer-events:auto;
+    touch-action:none; user-select:none; -webkit-user-select:none;
+    cursor:pointer; font-family:inherit; font-weight:900;
+    letter-spacing:1px; text-align:center;
+    width:var(--tbtn-ter); height:var(--tbtn-ter);
+    border-radius:50%;
+    background:radial-gradient(circle at 30% 22%, #1a3a6acc, #050a18cc 75%);
+    border:3px solid var(--c1, #3a8acc);
+    color:var(--c1, #cfe9ff);
+    box-shadow:
+      0 5px 0 #050a18,
+      0 0 18px var(--c1, #3a8acc)66,
+      inset 0 -6px 12px #00000088,
+      inset 0 4px 8px #ffffff22;
+    text-shadow:0 0 6px var(--c1, #00eaff), 0 1px 0 #050a18;
+    display:flex; align-items:center; justify-content:center;
+    transition:transform .12s cubic-bezier(.2,.8,.3,1.6), box-shadow .15s, filter .15s;
+  }
+  .tBtn svg{display:block; filter:drop-shadow(0 0 4px currentColor);}
+  .tBtn:active, .tBtn.held{
+    transform:translateY(2px) scale(.94);
+    box-shadow:0 1px 0 #050a18, 0 0 28px var(--c1, #00eaff)cc, inset 0 -4px 10px #00000088, inset 0 4px 8px #ffffff44;
+    filter:brightness(1.25) saturate(1.3);
+  }
+  .tBtn.disabled, .tBtn[data-empty="1"]{filter:grayscale(.7) brightness(.6); pointer-events:none;}
+
+  /* — Per-role sizes & colors — */
+  .tBtn.fire   { --c1:#ffea00; width:var(--tbtn-prim); height:var(--tbtn-prim); }
+  .tBtn.ability{ --c1:#ff66cc; width:var(--tbtn-sec);  height:var(--tbtn-sec);  }
+  .tBtn.boost  { --c1:#00ffaa; width:var(--tbtn-sec);  height:var(--tbtn-sec);  }
+  .tBtn.weapon { --c1:#9ec5ff; width:var(--tbtn-ter);  height:var(--tbtn-ter);  font-size:11px;}
+  .tBtn.pause  { --c1:#cfe9ff; width:var(--tbtn-ter);  height:var(--tbtn-ter);  }
+  .tBtn.cons   { width:var(--tbtn-ter); height:var(--tbtn-ter); font-size:18px; line-height:1;}
+  .tBtn.cons.heal  { --c1:#00ffaa; }
+  .tBtn.cons.shield{ --c1:#ffea00; }
+  .tBtn.cons.bomb  { --c1:#ff9933; }
+
+  /* — Cooldown / fuel state — driven by `--cd` (0–100) and `--fuel`
+     (0–100) on the ability and boost buttons respectively. We avoid
+     conic-gradient + mask (cross-browser flaky on iOS Safari and some
+     Chromium variants) and instead dim the button via filter when not
+     ready / low-fuel, and pulse it when ready. Subtle but robust. */
+  .tBtn.ability{
+    filter:saturate(calc(0.4 + var(--cd, 100) / 167))
+           brightness(calc(0.65 + var(--cd, 100) / 285));
+  }
+  .tBtn.ability[data-ready="1"]{
+    filter:saturate(1.3) brightness(1.15);
+    animation:abilityReadyPulse 1.2s ease-in-out infinite;
+  }
+  .tBtn.boost{
+    filter:saturate(calc(0.4 + var(--fuel, 100) / 167))
+           brightness(calc(0.65 + var(--fuel, 100) / 285));
+  }
+  @keyframes abilityReadyPulse{
+    0%,100%{box-shadow:0 5px 0 #050a18, 0 0 18px var(--c1, #ff66cc)66, inset 0 -6px 12px #00000088, inset 0 4px 8px #ffffff22;}
+    50%{box-shadow:0 5px 0 #050a18, 0 0 32px var(--c1, #ff66cc)cc, inset 0 -6px 12px #00000088, inset 0 4px 8px #ffffff44;}
+  }
+
+  /* — Consumable count badge — */
+  .tBtn.cons .ct{
+    position:absolute; top:-4px; right:-4px;
+    min-width:18px; height:18px; padding:0 4px;
+    border-radius:9px;
+    background:linear-gradient(180deg,#ffffff,#cfe9ff);
+    color:#050a18; font-size:11px; line-height:18px; font-weight:900;
+    border:2px solid #050a18; text-shadow:none;
+  }
+  .tBtn.cons .g{display:block; line-height:1;}
+
+  /* — Right cluster (combat: fire / ability / weapon) — */
+  .tBtn.fire{
+    right:calc(env(safe-area-inset-right) + var(--tbtn-edge));
+    bottom:calc(env(safe-area-inset-bottom) + var(--tbtn-edge));
+  }
+  .tBtn.ability{
+    right:calc(env(safe-area-inset-right) + var(--tbtn-edge) + var(--tbtn-prim) + var(--tbtn-gap));
+    bottom:calc(env(safe-area-inset-bottom) + var(--tbtn-edge) + (var(--tbtn-prim) - var(--tbtn-sec)) / 2);
+  }
+  .tBtn.weapon{
+    right:calc(env(safe-area-inset-right) + var(--tbtn-edge) + (var(--tbtn-prim) - var(--tbtn-ter)) / 2);
+    bottom:calc(env(safe-area-inset-bottom) + var(--tbtn-edge) + var(--tbtn-prim) + var(--tbtn-gap));
+  }
+
+  /* — Left cluster (movement: stick + boost) — */
+  .tBtn.boost{
+    left:calc(env(safe-area-inset-left) + var(--tbtn-edge) + 140px + var(--tbtn-gap));
+    bottom:calc(env(safe-area-inset-bottom) + var(--tbtn-edge) + (140px - var(--tbtn-sec)) / 2);
+  }
+  body.is-phone .tBtn.boost{
+    left:calc(env(safe-area-inset-left) + var(--tbtn-edge) + 120px + var(--tbtn-gap));
+    bottom:calc(env(safe-area-inset-bottom) + var(--tbtn-edge) + (120px - var(--tbtn-sec)) / 2);
+  }
+
+  /* — Top: pause (right corner, clear of HUD HULL panel which is left) — */
+  .tBtn.pause{
+    top:calc(env(safe-area-inset-top) + 8px);
+    right:calc(env(safe-area-inset-right) + 8px);
+  }
+
+  /* — Consumables: vertical column on the LEFT edge, below the HUD HULL
+       panel. Empty slots (count===0) get [data-empty="1"] from JS and
+       are dimmed-out + non-interactive so the player can read at a
+       glance which items they actually have. — */
+  .tBtn.cons{
+    left:calc(env(safe-area-inset-left) + 6px);
+  }
+  #cons1{ top:calc(env(safe-area-inset-top) + 96px); }
+  #cons2{ top:calc(env(safe-area-inset-top) + 96px + var(--tbtn-ter) + 6px); }
+  #cons3{ top:calc(env(safe-area-inset-top) + 96px + (var(--tbtn-ter) + 6px) * 2); }
+  body.is-phone #cons1{ top:calc(env(safe-area-inset-top) + 80px); }
+  body.is-phone #cons2{ top:calc(env(safe-area-inset-top) + 80px + var(--tbtn-ter) + 4px); }
+  body.is-phone #cons3{ top:calc(env(safe-area-inset-top) + 80px + (var(--tbtn-ter) + 4px) * 2); }
 
   /* responsive: tighter HUD on narrow screens */
   @media (max-width: 700px){
@@ -761,6 +908,11 @@
   body.is-phone #combo .mult{font-size:14px;}
   body.is-phone #combo .timer{width:60px;}
   body.is-phone #minimap{display:none !important;}
+  /* Tablet-portrait: minimap (bottom:36 right:14, 160×120) collides with
+     the unified touch-button cluster (fire + ability + weapon stacked at
+     bottom-right). The cluster is the higher-value UI; drop the minimap
+     here. Tablet-landscape keeps it because there's room. */
+  body.is-touch.is-portrait #minimap{display:none !important;}
   body.is-phone #hudBottom{display:none !important;}
   /* The keyboard-hint bar at the bottom of the screen is desktop-only;
      it overlaps the touch controls on tablets. */
@@ -831,18 +983,10 @@
   body.is-phone .sideBtn .badge{min-width:16px;height:16px;font-size:9px;line-height:13px;}
   body.is-phone .sideBtn .tip{display:none;}
 
-  /* — Touch controls: tighter ergonomics for landscape phones — */
-  body.is-phone #stick{width:90px;height:90px;left:10px;bottom:10px;border-width:2px;}
-  body.is-phone #stick .nub{width:38px;height:38px;}
-  body.is-phone .tBtn.fire{width:74px;height:74px;line-height:74px;right:10px;bottom:10px;font-size:13px;}
-  body.is-phone .tBtn.ability{right:92px;bottom:42px;width:50px;height:50px;line-height:50px;font-size:11px;}
-  body.is-phone .tBtn.weapon{bottom:90px;right:10px;width:46px;height:46px;line-height:46px;font-size:9px;}
-  body.is-phone .tBtn.boost{left:106px;bottom:42px;width:50px;height:50px;line-height:50px;font-size:10px;}
-  body.is-phone .tBtn.pause{top:6px;right:6px;width:36px;height:36px;line-height:36px;font-size:11px;}
-  body.is-phone .tBtn.cons{width:34px;height:34px;line-height:34px;font-size:9px;}
-  body.is-phone #cons1{left:10px;top:108px;}
-  body.is-phone #cons2{left:48px;top:108px;}
-  body.is-phone #cons3{left:86px;top:108px;}
+  /* — Phone touch controls: positioning lives in the unified block at
+     the top of this file (driven by --tbtn-* CSS vars). Only the pause
+     button needs a tighter offset for the phone HUD. — */
+  body.is-phone .tBtn.pause{top:calc(env(safe-area-inset-top) + 4px);right:calc(env(safe-area-inset-right) + 4px);}
 
   /* — Shop / modal sizing — */
   body.is-phone #menuShop{width:98vw;max-height:96vh;}
@@ -969,12 +1113,8 @@
   body.is-phone.is-portrait #hubCenter{top:88px;bottom:96px;}
   body.is-phone.is-portrait #hubHero canvas{width:120px !important;height:120px !important;}
 
-  /* In-game touch controls in portrait — taller play area, lower button row */
-  body.is-phone.is-portrait #stick{left:8px;bottom:8px;}
-  body.is-phone.is-portrait .tBtn.fire{right:8px;bottom:8px;}
-  body.is-phone.is-portrait .tBtn.ability{right:90px;bottom:36px;}
-  body.is-phone.is-portrait .tBtn.weapon{bottom:88px;right:8px;}
-  body.is-phone.is-portrait .tBtn.boost{left:104px;bottom:36px;}
+  /* In-game touch controls in portrait: positioning is now driven by
+     the unified --tbtn-* vars at the top of the file. */
 
   /* Eventribbon hidden in portrait (would compete with title) */
   body.is-phone.is-portrait .eventRibbon{display:none;}
