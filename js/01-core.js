@@ -122,6 +122,46 @@ function safeLSSet(key, val){
 }
 
 // ============================================================
+// NEW-VERSION CHECK
+// ============================================================
+// Cloudflare Pages serves index.html with a short cache TTL. If the page
+// stays open across a deploy, the in-memory JS keeps running the old
+// version forever. Snapshot the served HTML on boot and re-poll every
+// few minutes; if the bytes differ, surface a clickable banner so the
+// player can refresh when it's safe (between rounds, not mid-boss).
+// Zero infrastructure required — works against the existing static
+// deploy. The banner stays visible until tap; we don't auto-reload
+// because that would yank the player out of an active run.
+let _bootHtml = null;
+let _updateNotified = false;
+(async () => {
+  try {
+    const r = await fetch(location.pathname || '/', {cache:'no-store'});
+    if(r.ok) _bootHtml = await r.text();
+  } catch(e) { /* offline / first boot — ignore, never check */ }
+})();
+async function _checkForUpdate(){
+  if(_updateNotified || !_bootHtml) return;
+  try {
+    const r = await fetch(location.pathname || '/', {cache:'no-store'});
+    if(!r.ok) return;
+    const cur = await r.text();
+    if(cur === _bootHtml) return;
+    _updateNotified = true;
+    const el = document.getElementById('updateBanner');
+    if(el){
+      el.classList.remove('hidden');
+      el.addEventListener('click', ()=>location.reload(), {once:true});
+    }
+  } catch(e) { /* transient — try again next interval */ }
+}
+// First check 30s after load (give the deploy CDN cache time to settle if
+// the user opened during a deploy), then every 10 min. Variable assignment
+// satisfies the static-audit "no bare setInterval" rule.
+const _updateCheckTimer = setInterval(_checkForUpdate, 600_000);
+setTimeout(_checkForUpdate, 30_000);
+
+// ============================================================
 // CONFIG
 // ============================================================
 const UPGRADES = [

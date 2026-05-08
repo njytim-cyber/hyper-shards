@@ -261,6 +261,28 @@
   /* Toast */
   #toast{position:fixed;bottom:60px;left:50%;transform:translateX(-50%);background:#0a1430ee;border:1px solid #00eaff;color:#cfe9ff;padding:8px 16px;border-radius:6px;opacity:0;transition:.3s;pointer-events:none;font-size:13px;letter-spacing:2px;z-index:20;}
 
+  /* Update-available pill — shown when boot index.html differs from the
+     currently-served one. Persistent (no auto-hide) and clickable so the
+     player can finish a run before refreshing. Sits above #overlay so the
+     menu darkening doesn't fade it out. */
+  #updateBanner{
+    position:fixed; top:14px; left:50%; transform:translateX(-50%);
+    z-index:60; cursor:pointer; font-family:inherit; font-weight:900;
+    letter-spacing:2px; font-size:12px; padding:8px 18px;
+    color:#050a18; text-shadow:0 1px 0 #ffffff66;
+    background:linear-gradient(180deg,#ffea00,#cc8800);
+    border:3px solid #050a18; border-radius:30px;
+    box-shadow:0 4px 0 #050a18, 0 6px 18px #ffea0066, inset 0 2px 0 #ffffff66;
+    animation:updatePulse 1.6s ease-in-out infinite;
+  }
+  #updateBanner:hover{filter:brightness(1.1);}
+  #updateBanner.hidden{display:none;}
+  @keyframes updatePulse{
+    0%,100%{transform:translate(-50%,0) scale(1)}
+    50%{transform:translate(-50%,-2px) scale(1.04)}
+  }
+  body.is-phone #updateBanner{font-size:10px;padding:6px 14px;letter-spacing:1px;top:8px;}
+
   /* Tutorial in-game caption */
   #tutCaption{position:fixed;top:80px;left:50%;transform:translateX(-50%);background:#0a1430ee;border:1px solid #00eaff;color:#fff;padding:10px 20px;border-radius:8px;font-size:14px;letter-spacing:2px;display:none;z-index:9;text-align:center;max-width:600px;box-shadow:0 0 30px #00eaff66;}
   #tutCaption .next{color:#ffea00;font-size:11px;display:block;margin-top:4px;}
