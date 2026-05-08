@@ -51,7 +51,7 @@ js/11-render.js                canvas drawing, ship/bullet/enemy/boss
 js/12-icons.js                 shop icons + 3D Bloons-style menu icons
 js/13-hub.js                   Bloons-style main hub menu
 js/14-boss-arena.js            boss-rush mode + final boot (showMenu('menuMain'))
-audio/                         Lyria-2 generated tracks (mp3, 128kbps)
+audio/                         Lyria-2 generated tracks (mp3, 96kbps; originals at 128kbps in audio/original)
 test/*.test.js                 Node 24 native test runner, no deps
 ```
 
@@ -172,13 +172,17 @@ Verified across 5 device profiles via Playwright screenshots — see
 
 ## Music
 
-- 7 Lyria-generated MP3s in `audio/`, 128kbps stereo
+- 7 Lyria-generated MP3s in `audio/`, **96 kbps stereo** (originals at
+  128 kbps preserved in `audio/original/`). Total ~12 MB, down from
+  ~16 MB; first-paint (`menu`+`play` eager) is ~3.8 MB instead of ~5 MB.
 - Loaded via `<audio>` elements (not WebAudio decode) — gapless loop via `'ended'` re-listen
 - Lazy preload: only `menu` + `play` tracks eager-load; boss/enrage/final/victory/gameover
-  fetch on demand to keep first-paint network weight ~5MB
+  fetch on demand
 - Modes: `setMusicMode('menu'|'play'|'boss'|'boss-enrage'|'final-boss'|'gameover')`
   with 700ms crossfade
 - One-shot stinger: `playMusicSting('victory')`
+- Volume: scaled by `save.musicVol` (0–100, default 70). `refreshMusicVolume()`
+  re-applies live as the slider moves in settings.
 
 ## Stability hardening (added 2026-05)
 
