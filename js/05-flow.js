@@ -259,7 +259,11 @@ function renderShop(){
         save.credits -= s.cost; save.skins[id]=true;
       }
       save.skin = id;
-      if(player) player.skin = s;
+      // Reset the live cooldown when swapping skins mid-run — different
+      // skins have different ability cooldowns, and leaving the old
+      // value in player.abilityCd makes the HUD bar read as stuck at
+      // 0% (the new ab.cd may be smaller than the old leftover value).
+      if(player){ player.skin = s; player.abilityCd = 0; }
       persist(); renderShop(); toast('Equipped '+s.name);
     };
   });

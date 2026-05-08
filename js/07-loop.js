@@ -135,11 +135,18 @@ function loop(now){
       // backlog so we don't fast-forward when focus returns.
       if(steps >= MAX_SUBSTEPS) _physicsAcc = 0;
       // HUD/effect timers tick on real wall-clock dt (not slow-mul'd) so
-      // a 10s rapid powerup is always 10 real seconds.
+      // a 10s rapid powerup is always 10 real seconds. Player ability
+      // cooldown is also wall-clock — moved out of update() so picking
+      // up a slow-time powerup doesn't slow your own ability recharge,
+      // and so a slow phone (where the substep accumulator can fall
+      // behind) still recharges abilities in real time.
       if(state.phase==='play'){
         state.fx.rapid = Math.max(0, state.fx.rapid-dt);
         state.fx.dmg   = Math.max(0, state.fx.dmg-dt);
         state.fx.slow  = Math.max(0, state.fx.slow-dt);
+        if(typeof player !== 'undefined' && player && player.abilityCd > 0){
+          player.abilityCd = Math.max(0, player.abilityCd - dt);
+        }
         comboTick(dt);
       }
       maybeUpdateHud(dt);

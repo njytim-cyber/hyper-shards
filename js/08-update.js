@@ -49,7 +49,8 @@ function update(dt){
   if(keys[' ']) fire(player, curWeapon());
   if(player.cd>0) player.cd -= dt;
   if(player.inv>0) player.inv -= dt;
-  if(player.abilityCd>0) player.abilityCd -= dt;
+  // abilityCd is decremented in the main loop (07-loop.js) on real-time
+  // dt so slow-time and slow-fps don't stretch the player's own recharge.
   if(player.fxBerserk>0) player.fxBerserk -= dt;
   if(player.fxFlame>0)   player.fxFlame -= dt;
   if(player.fxCloak>0)   player.fxCloak -= dt;
@@ -465,8 +466,15 @@ function update(dt){
 
   if(state.shake>0) state.shake = Math.max(0, state.shake-0.6);
 
+  // Persist throttle: this used to fire every physics tick (~60×/sec),
+  // which on a slow phone meant 60 JSON.stringify+localStorage.setItem
+  // calls per second — enough to stretch each frame and make game time
+  // crawl behind wall-clock. Now we save at most once per second; the
+  // important crossings (round end, shop buy, achievement claim) all
+  // call persist() explicitly so we don't lose data on a tab close.
   if(state.phase==='play'){
-    persist();
+    state._persistAcc = (state._persistAcc||0) + dt;
+    if(state._persistAcc >= 1000){ state._persistAcc = 0; persist(); }
   }
   updateHud();
 }
@@ -561,7 +569,10 @@ function updateHud(){
       $.abName.textContent = ab.name;
     }
     const ready = player.abilityCd<=0;
-    const pct = ready ? 100 : (1 - player.abilityCd/ab.cd)*100;
+    // Clamp to 0..100 — if a skin swap leaves abilityCd > the new
+    // skin's cd, the raw formula goes negative and the bar reads as
+    // permanently empty. Math.max keeps it pinned at 0 instead.
+    const pct = ready ? 100 : Math.max(0, Math.min(100, (1 - player.abilityCd/ab.cd)*100));
     const pctBucket = Math.round(pct); // 1% buckets is more than enough
     if(_hudCache.abilityPct !== pctBucket){
       _hudCache.abilityPct = pctBucket;

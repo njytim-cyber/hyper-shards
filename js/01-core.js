@@ -88,7 +88,8 @@ const defaultSave = () => ({
   consumables: { heal:0, shield:0, bomb:0, revive:0 },
   specials: { autoRepair:false, drone:false, shockwave:false, magnetMax:false },
   skins: { default:true, crimson:false, void:false, solar:false, prism:false, eclipse:false, phoenix:false, glacier:false, neon:false },
-  skin: 'default'
+  skin: 'default',
+  hubBg: 'nebula'
 });
 let save = loadSave();
 function loadSave(){
