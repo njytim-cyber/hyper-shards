@@ -1,0 +1,28 @@
+# Cloudflare Pages headers config.
+# Static deploy, no bundler, no content-hashed filenames — keep
+# HTML/CSS/JS caches short so an `index.html` update lands within
+# minutes. Audio files are stable Lyria-generated MP3s, cache them
+# aggressively.
+
+/*.html
+  Cache-Control: public, max-age=300, must-revalidate
+
+/
+  Cache-Control: public, max-age=300, must-revalidate
+
+/css/*
+  Cache-Control: public, max-age=300
+
+/js/*
+  Cache-Control: public, max-age=300
+
+/audio/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Light security hardening. The game is a single static page with no
+# user-generated content, no third-party iframes, no server side, so
+# these are conservative defaults.
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: geolocation=(), microphone=(), camera=()

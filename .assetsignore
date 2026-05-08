@@ -1,0 +1,28 @@
+# Cloudflare Pages — files to skip when building the deploy bundle.
+# Without this, Pages reads the entire repo (including node_modules
+# from its own auto-installed wrangler/workerd) and trips the per-asset
+# 25 MiB limit (workerd binary alone is ~119 MiB).
+#
+# Same syntax as .gitignore.
+
+node_modules/
+.git/
+.github/
+.claude/
+.vscode/
+
+# Dev-only tooling — never served
+package.json
+package-lock.json
+.npmrc
+playwright.config.js
+test/
+test-results/
+playwright-report/
+
+# Docs (not part of the game)
+CLAUDE.md
+README.md
+
+# Source archives we keep for reference
+audio/original/

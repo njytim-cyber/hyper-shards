@@ -7,7 +7,7 @@ This file is durable context for future Claude sessions.
 
 **Pure JavaScript. No TypeScript, no bundler, no build step.**
 - HTML + CSS + classic `<script>` tags loaded in order from `js/01-*.js` → `js/14-*.js`
-- Deployed by serving the repo root as static files (Cloudflare Pages, no `build` command)
+- Deployed on **Cloudflare Pages** by serving the repo root as static files. Build command: empty. Output dir: `/`. Cache headers in `_headers` (HTML/CSS/JS short, `audio/*` immutable for 1 year).
 - Unit tests use Node 24's built-in `node:test` runner with a stubbed-DOM `vm` sandbox — zero runtime deps
 - E2E tests use Playwright (`@playwright/test`) — installed as the only `devDependency`. Runs Chromium against three device-profile projects (desktop / tablet / phone) hitting the same `http-server` we deploy with.
 
