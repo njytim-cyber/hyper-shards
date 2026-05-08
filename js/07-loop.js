@@ -88,6 +88,15 @@ state._tutPollDisabled = false;
 let lastT = performance.now();
 const ACTIVE_PHASES = new Set(['play','tutorial','pvp','dead']);
 let _loopErrorCount = 0;
+// Fixed-timestep physics. Position updates throughout the codebase use raw
+// per-frame velocity (`x += vx`), so a phone running at 30fps used to advance
+// the world at half the speed of a 60fps desktop — players reported the game
+// "felt slow on phones." Now we accumulate real elapsed time and drive
+// update() at a constant FIXED_STEP, so the game logic ticks at a consistent
+// rate regardless of render frame rate.
+const FIXED_STEP = 16;       // ms per physics tick (≈ 60Hz)
+const MAX_SUBSTEPS = 4;      // cap to avoid spiral-of-death on a slow phone
+let _physicsAcc = 0;
 function loop(now){
   // Error boundary: a single throw inside update()/render() must NOT
   // tear down the rAF chain — the player would be stuck on a frozen
@@ -96,20 +105,43 @@ function loop(now){
   try {
     let dt = Math.min(40, now-lastT);
     lastT = now;
-    if(state.hitStop > 0){ state.hitStop = Math.max(0, state.hitStop - (now-lastT||16)); render(); requestAnimationFrame(loop); return; }
+    if(state.hitStop > 0){
+      state.hitStop = Math.max(0, state.hitStop - (dt||16));
+      render();
+      requestAnimationFrame(loop);
+      return;
+    }
     const slowMul = state.fx.slow>0 ? 0.4 : 1;
-    if(state.phase==='play' || state.phase==='tutorial'){
-      update(dt * (state.phase==='play'?slowMul:1));
+    const playing = state.phase==='play' || state.phase==='tutorial';
+    if(playing || state.phase==='pvp'){
+      // Accumulate real time. slowMul applies on play (slow-time effect)
+      // by feeding the accumulator a fraction of real-time, so the world
+      // advances slower while wall-clock cooldowns/HUD still tick at 1×.
+      const playSlow = (state.phase==='play') ? slowMul : 1;
+      _physicsAcc += dt * playSlow;
+      let steps = 0;
+      while(_physicsAcc >= FIXED_STEP && steps < MAX_SUBSTEPS){
+        if(playing) update(FIXED_STEP);
+        else updatePvp(FIXED_STEP);
+        _physicsAcc -= FIXED_STEP;
+        steps++;
+      }
+      // If we capped sub-steps (very slow render, e.g. tab-out), drop the
+      // backlog so we don't fast-forward when focus returns.
+      if(steps >= MAX_SUBSTEPS) _physicsAcc = 0;
+      // HUD/effect timers tick on real wall-clock dt (not slow-mul'd) so
+      // a 10s rapid powerup is always 10 real seconds.
       if(state.phase==='play'){
         state.fx.rapid = Math.max(0, state.fx.rapid-dt);
         state.fx.dmg   = Math.max(0, state.fx.dmg-dt);
         state.fx.slow  = Math.max(0, state.fx.slow-dt);
         comboTick(dt);
-        maybeUpdateHud(dt);
       }
-    } else if(state.phase==='pvp'){
-      updatePvp(dt);
       maybeUpdateHud(dt);
+    } else {
+      // Reset accumulator while in menus so the first frame of a new run
+      // doesn't burn a leftover backlog into instant motion.
+      _physicsAcc = 0;
     }
     // Only paint the in-game canvas when the player can actually see it.
     // In menus the overlay covers the canvas; drawing nebula/streaks/etc.

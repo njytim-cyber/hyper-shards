@@ -781,7 +781,12 @@
   body.is-phone .eventRibbon .t{font-size:10px;letter-spacing:2px;}
   body.is-phone .eventRibbon .s{font-size:9px;letter-spacing:1px;}
   body.is-phone #hubTitle{top:42px;}
-  body.is-phone .hubTitleText{font-size:26px;letter-spacing:4px;}
+  body.is-phone .hubTitleText{
+    font-size:26px;letter-spacing:4px;white-space:nowrap;
+    /* Trim the desktop multi-shadow halo so it doesn't bleed into the
+       side-icon column on the narrow phone viewport. */
+    filter:drop-shadow(0 0 10px #00eaff88) drop-shadow(0 2px 0 #050a18);
+  }
   body.is-phone .hubTitleSub{font-size:9px;letter-spacing:3px;margin-top:2px;}
   body.is-phone #hubCenter{top:88px;bottom:120px;}
   body.is-phone #hubHero canvas{width:140px !important;height:140px !important;}
@@ -901,8 +906,12 @@
   body.is-phone.is-portrait .pilotBadge .name{font-size:9px;}
   body.is-phone.is-portrait .pilotBadge .xpbar{width:54px;height:8px;}
   body.is-phone.is-portrait .pilotBadge .xpwrap{display:none;} /* xp not critical in portrait */
-  body.is-phone.is-portrait #hubSideL{left:8px;top:78px;gap:6px;}
-  body.is-phone.is-portrait #hubSideR{right:8px;top:78px;gap:6px;}
+  /* Side icons live below the title row. The previous top:78px put their
+     halo right under the title's drop-shadow, which read as overlap on
+     real phones; pushing them to 96px gives the title clear vertical
+     breathing room while still leaving plenty of canvas below. */
+  body.is-phone.is-portrait #hubSideL{left:6px;top:96px;gap:8px;}
+  body.is-phone.is-portrait #hubSideR{right:6px;top:96px;gap:8px;}
   body.is-phone.is-portrait .sideBtn{width:34px;height:34px;font-size:14px;}
   body.is-phone.is-portrait .sideSlot .sideLbl{font-size:7px;padding:1px 5px;}
 
@@ -920,11 +929,22 @@
     100%{transform:rotate(360deg) translate(0, -42px) rotate(-360deg)}
   }
 
-  /* Hub title — keep on one line in portrait */
-  body.is-phone.is-portrait .hubTitleText{font-size:22px;letter-spacing:3px;}
-  body.is-phone.is-portrait .hubTitleSub{font-size:8px;letter-spacing:2px;}
-  body.is-phone.is-portrait #hubTitle{top:38px;}
-  body.is-phone.is-portrait #hubCenter{top:80px;bottom:96px;}
+  /* Hub title — sits in the gap between the top badge row (~y=32) and
+     the side-icon column (now at top:96px). Sized so the title fits
+     entirely in the centre lane between the two badges; the trimmed
+     drop-shadow keeps the cyan/magenta glow from bleeding sideways. */
+  body.is-phone.is-portrait #hubTitle{
+    top:38px;
+    /* Pin to centre with a hard width box so the text can never reach
+       the pilot badge (left) or shard bar (right) corners. */
+    width:auto; max-width:60vw;
+  }
+  body.is-phone.is-portrait .hubTitleText{
+    font-size:17px; letter-spacing:1.5px; white-space:nowrap;
+    filter:drop-shadow(0 0 6px #00eaff88) drop-shadow(0 2px 0 #050a18);
+  }
+  body.is-phone.is-portrait .hubTitleSub{font-size:7px;letter-spacing:1.5px;margin-top:1px;}
+  body.is-phone.is-portrait #hubCenter{top:88px;bottom:96px;}
   body.is-phone.is-portrait #hubHero canvas{width:120px !important;height:120px !important;}
 
   /* In-game touch controls in portrait — taller play area, lower button row */
@@ -936,6 +956,14 @@
 
   /* Eventribbon hidden in portrait (would compete with title) */
   body.is-phone.is-portrait .eventRibbon{display:none;}
+
+  /* On phone-portrait main hub, the floating #saveBar (top-right) duplicates
+     the credit count that the shardBar already shows in the same corner —
+     and its extra "BEST 0" widens the box enough to crash into the
+     "HYPER SHARDS" title. Hide saveBar specifically on the main hub; other
+     menus (difficulty/shop/etc.) still show it because they don't render
+     the shardBar. */
+  body.is-phone.is-portrait:has(#menuMain.active) #saveBar{display:none;}
 
   /* Tablet-portrait: VOID INCURSION ribbon collides with the saveBar on
      the right. Shrink it and constrain max-width so it doesn't crowd
