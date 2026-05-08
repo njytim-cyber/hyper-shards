@@ -36,6 +36,26 @@ function updateBoss(dt){
   }
   const rage = b.rage ? 0.45 : (b.phase2 ? 0.7 : 1);
   b.cd -= dt; b.cd2 -= dt; b.cd3 -= dt; b.cd4 = (b.cd4||0) - dt;
+  // Telegraph window — when any attack cooldown is in [0, TEL_MS], the
+  // boss is "charging" and we light it up + play a one-shot warning
+  // beep so the player has time to read the wind-up before bullets fly.
+  // The render layer reads b.charge (ms-remaining) to draw the aura.
+  const TEL_MS = 380;
+  let charging = 0;
+  function _warn(key, attackId){
+    const v = b[key];
+    if(v > 0 && v <= TEL_MS){
+      if(v > charging) charging = v;
+      if(!b['_armed_'+attackId]){ b['_armed_'+attackId] = true; sfx('warn'); }
+    } else if(v > TEL_MS){
+      b['_armed_'+attackId] = false;
+    }
+  }
+  _warn('cd', 1);
+  _warn('cd2', 2);
+  if(b.tier>=2) _warn('cd3', 3);
+  if(b.tier>=3 && b.phase2) _warn('cd4', 4);
+  b.charge = charging;
   if(b.cd<=0){
     b.cd = 600 * rage * d.fireRate;
     const n = 18 + b.tier*3;

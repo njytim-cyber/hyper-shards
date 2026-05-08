@@ -162,6 +162,9 @@ function sfx(type){
   else if(type==='ability'){f0=200;f1=1600;dur=0.3; type2='sawtooth'; vol=0.08; }
   else if(type==='combo'){f0=800; f1=1200;dur=0.06; type2='square'; vol=0.04; }
   else if(type==='achieve'){f0=400;f1=1800;dur=0.4; type2='triangle'; vol=0.07; }
+  // Boss telegraph: rising-pitch sting before each attack pattern fires.
+  // Short and quiet so it cues without competing with combat SFX.
+  else if(type==='warn'){f0=500; f1=1100;dur=0.18; type2='triangle'; vol=0.05; }
   o.type = type2;
   o.frequency.setValueAtTime(f0, t);
   o.frequency.exponentialRampToValueAtTime(Math.max(20,f1), t+dur);

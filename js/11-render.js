@@ -538,6 +538,28 @@ function drawEnemy(e){
 function drawBoss(b){
   ctx.save();
   ctx.translate(b.x,b.y);
+  // Charge telegraph — pulsing white-on-color halo during the brief
+  // wind-up before each attack fires. Pulse amplitude scales with how
+  // close we are to "now" so the visual rises into the impact.
+  if(b.charge > 0){
+    const k = 1 - b.charge/380; // 0 → 1 over the telegraph window
+    const r = b.r * (1.05 + k*0.35);
+    const op = 0.25 + k*0.55;
+    ctx.save();
+    ctx.globalAlpha = op;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 3 + k*4;
+    ctx.shadowColor = b.color;
+    ctx.shadowBlur = LOW_FX ? 0 : 30;
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI*2); ctx.stroke();
+    // Inner color ring picks up the boss accent so the player can read
+    // direction even on the brightest white-out frames.
+    ctx.globalAlpha = op*0.7;
+    ctx.strokeStyle = b.color;
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(0, 0, r*0.92, 0, Math.PI*2); ctx.stroke();
+    ctx.restore();
+  }
   ctx.shadowColor = b.color; ctx.shadowBlur = 40;
   const t = b.t/600;
   ctx.strokeStyle = b.color; ctx.lineWidth = 4;
