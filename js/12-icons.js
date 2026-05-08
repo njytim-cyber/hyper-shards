@@ -420,23 +420,27 @@ function draw3DMenuIcon(g, type){
       stroke ? g.stroke() : g.fill();
     }, goggles, '#003a55', '#ffffff', 2);
 
-    // Visor reflection (two bright dots)
-    g.fillStyle = '#ffffff';
-    g.beginPath(); g.arc(-3, -4, 1.2, 0, Math.PI*2); g.fill();
-    g.beginPath(); g.arc( 4, -3, 1.0, 0, Math.PI*2); g.fill();
-
-    // Face hint behind visor (subtle eyes)
-    g.fillStyle = '#000000aa';
-    if(expression==='happy'){
-      g.beginPath(); g.arc(-2, 0, 0.9, 0, Math.PI*2); g.fill();
-      g.beginPath(); g.arc( 2, 0, 0.9, 0, Math.PI*2); g.fill();
-    } else if(expression==='angry'){
-      g.fillRect(-3.5, -1, 2.5, 1);
-      g.fillRect( 1, -1, 2.5, 1);
-    } else if(expression==='wink'){
-      g.fillRect(-3, 0, 2, 0.8);
-      g.beginPath(); g.arc( 2, 0, 0.9, 0, Math.PI*2); g.fill();
-    }
+    // Visor reflection — clean diagonal sheen instead of a face peek.
+    // The previous version drew tiny eyes/mouth behind the visor which
+    // read as a children's-cartoon mascot; a simple gloss highlight
+    // looks like a real reflective helmet.
+    g.save();
+    g.beginPath();
+    g.moveTo(-7, 1);
+    g.quadraticCurveTo(-7, -6, 0, -7);
+    g.quadraticCurveTo(7, -6, 7, 1);
+    g.quadraticCurveTo(0, 4, -7, 1);
+    g.closePath();
+    g.clip();
+    const sheen = g.createLinearGradient(-7, -6, 7, 4);
+    sheen.addColorStop(0,    '#ffffff00');
+    sheen.addColorStop(0.35, '#ffffffaa');
+    sheen.addColorStop(0.55, '#ffffff00');
+    sheen.addColorStop(0.7,  '#ffffff44');
+    sheen.addColorStop(1,    '#ffffff00');
+    g.fillStyle = sheen;
+    g.fillRect(-10, -10, 20, 20);
+    g.restore();
 
     // Helmet antenna with red blinker
     g.strokeStyle = OUTLINE; g.lineWidth = 1.5;
@@ -451,18 +455,9 @@ function draw3DMenuIcon(g, type){
 
     g.restore();
 
-    // === Cape/streamer behind ===
-    g.save(); g.translate(-8, -3);
-    celShape((g, stroke)=>{
-      g.beginPath();
-      g.moveTo(0, 0);
-      g.lineTo(-12, 0 + Math.sin(t/200)*1.5);
-      g.lineTo(-14, 4 + Math.sin(t/200)*1.5);
-      g.lineTo(-2, 4);
-      g.closePath();
-      stroke ? g.stroke() : g.fill();
-    }, scarf, '#aa1122', '#ff8888');
-    g.restore();
+    // (Removed the old fluttering "cape" streamer — it read like a
+    // crayon flag and didn't fit a spacecraft. Engine flames + the
+    // tail accent fin are enough silhouette punctuation.)
 
     // Tiny stars sparkling around the ship
     g.fillStyle='#ffffff';

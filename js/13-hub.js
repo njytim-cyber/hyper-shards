@@ -296,9 +296,40 @@ function drawHubScene(){
   }
 }
 
-// Hero astronaut centerpiece (just let the adaptive icon fill the 320x320 canvas)
+// Hero centerpiece — render the actual in-game ship using the player's
+// current skin, scaled up. The previous version used the cartoon plane
+// mascot with a smiling face peeking through the visor; this replaces
+// it with the real spacecraft art so the hub mirrors what the player
+// flies and the hero reads as a proper ship instead of a kids-show
+// mascot. Soft idle thrust + slow facing rotation give it life.
 function drawHubHero(){
-  draw3DMenuIcon(hubHeroCtx, 'ship');
+  const c = hubHeroCanvas;
+  const w = c.width, h = c.height;
+  const g = hubHeroCtx;
+  g.save();
+  g.clearRect(0, 0, w, h);
+  // Re-resolve skin every frame in case the player just equipped a new
+  // one in the shop and returned to the hub (cheap lookup, ~15 entries).
+  const skinId = (save && save.skin) || 'default';
+  const sk = SKINS.find(s=>s.id===skinId) || SKINS[0];
+  // Soft pulsing thrust so the engines look "idling" but not roaring.
+  const t = performance.now();
+  const thrust = 0.45 + Math.sin(t/700)*0.15;
+  // Slight gimbal tilt so the ship doesn't look statue-still.
+  const tilt = Math.sin(t/1100) * 0.08;
+  // Re-centre to canvas, scale up — drawShip is designed for ~32px high
+  // sprites; multiplying by 6.5 fills the 380x380 hub canvas comfortably.
+  g.translate(w/2, h/2);
+  g.scale(6.5, 6.5);
+  drawShip(g, {
+    x: 0, y: 0, vx: 0, vy: 0,
+    skin: sk,
+    facing: -Math.PI/2 + tilt,
+    thrust,
+    inv: 0,
+    isAi: false,
+  }, t);
+  g.restore();
 }
 
 function updateHubInfo(){
