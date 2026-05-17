@@ -422,6 +422,10 @@
   .tBtn.cons.heal  { --c1:#00ffaa; }
   .tBtn.cons.shield{ --c1:#ffea00; }
   .tBtn.cons.bomb  { --c1:#ff9933; }
+  /* Ultimate (mastered-skin only) — gold theme, sized like the other
+     action buttons. Greyed by [data-ready="0"] until mastered. */
+  .tBtn.ultimate   { --c1:#ffd700; }
+  .tBtn.ultimate[data-ready="0"]{ filter:grayscale(.7) brightness(.55); }
 
   /* — Cooldown / fuel state — driven by `--cd` (0–100) and `--fuel`
      (0–100) on the ability and boost buttons respectively. We avoid

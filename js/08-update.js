@@ -532,6 +532,7 @@ function _ensureHudEls(){
     // consumable count badges). Resolved once and cached so the 15Hz
     // tick doesn't pay 6 getElementByIds.
     tAbility: document.getElementById('tAbility'),
+    tUltimate: document.getElementById('tUltimate'),
     tBoost:   document.getElementById('tBoost'),
     cons1: document.getElementById('cons1'), cons1Ct: document.getElementById('cons1Ct'),
     cons2: document.getElementById('cons2'), cons2Ct: document.getElementById('cons2Ct'),
@@ -633,6 +634,21 @@ function updateHud(){
         _hudCache.abReady = r;
         $.tAbility.dataset.ready = r;
       }
+    }
+  }
+  // === Touch ULTIMATE button ready state ===
+  // Greys when the equipped skin isn't mastered OR when the ult is on
+  // cooldown. Read-driven from save.skinXp + state.ultCd each tick.
+  if($.tUltimate){
+    const skinId = save && (save.skin || 'default');
+    const ultReady = (typeof isSkinMastered === 'function')
+      && skinId
+      && isSkinMastered(skinId)
+      && ((state.ultCd || 0) <= 0);
+    const r = ultReady ? '1' : '0';
+    if(_hudCache.ultReady !== r){
+      _hudCache.ultReady = r;
+      $.tUltimate.dataset.ready = r;
     }
   }
   // Boost fuel ring — same pattern. boostMax depends on upgrades; recompute

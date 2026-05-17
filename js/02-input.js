@@ -158,6 +158,10 @@ function setupTouch(){
   }
   tapBtn('tWeapon', ()=>{ if(state.phase==='play'||state.phase==='pvp') cycleWeapon(); });
   tapBtn('tAbility',()=>{ if(state.phase==='play') triggerAbility(); });
+  // Ultimate (mastered-skin only). triggerUltimate itself shows a
+  // "ULT LOCKED" toast when the skin isn't mastered yet, so the
+  // button can be tapped at any time — it just won't fire.
+  tapBtn('tUltimate', ()=>{ if(state.phase==='play' && typeof triggerUltimate==='function') triggerUltimate(); });
   tapBtn('tPause',  ()=>{ if(state.phase==='play') pause(); else if(state.phase==='paused') resume(); });
   tapBtn('cons1',   ()=>{ if(state.phase==='play') useConsumable('heal'); });
   tapBtn('cons2',   ()=>{ if(state.phase==='play') useConsumable('shield'); });

@@ -115,6 +115,18 @@
             fill="currentColor" stroke="currentColor" stroke-width="0.6" stroke-linejoin="round"/>
     </svg>
   </button>
+  <!-- Ultimate (mastered-skin only) — was keyboard-only via E. Touch
+       devices had no way to fire it. Tinted gold to match the
+       mastery-unlock theme. Visually disabled (greyed) until the
+       equipped skin is mastered; the tap handler also gates on
+       isSkinMastered(). -->
+  <button class="tBtn ultimate" id="tUltimate" aria-label="Ultimate">
+    <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true">
+      <!-- 5-point filled star -->
+      <path d="M12 2 L14.6 8.6 L21.6 9.1 L16.3 13.7 L18.0 20.6 L12 16.9 L6 20.6 L7.7 13.7 L2.4 9.1 L9.4 8.6 Z"
+            fill="currentColor" stroke="currentColor" stroke-width="0.5" stroke-linejoin="round"/>
+    </svg>
+  </button>
   <button class="tBtn weapon" id="tWeapon" aria-label="Cycle weapon">
     <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
       <!-- arrows-cycle / reload -->

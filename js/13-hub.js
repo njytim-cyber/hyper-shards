@@ -484,14 +484,22 @@ const ALL_ACHIEVEMENTS = [
 // routes to the existing menu (or starts 3D mode). Available on every
 // form factor but only the MODES button (phone-only via CSS) opens it. ===
 function openModesModal(){
+  // Render the 4 absorbed nav buttons as actual .navBtn cards (icon
+  // canvas + label + ribbon) so the MODES modal looks like a mini
+  // version of the desktop bottom-row instead of plain text buttons.
+  // After the markup is injected, paintHubNavIcons() paints the
+  // canvases via draw3DMenuIcon.
   openHubModal(`
     <h2><span class="ic">▶</span>GAME MODES</h2>
     <p style="color:#9ec5ff;text-align:center;margin:6px 0 14px;font-size:11px;letter-spacing:2px;">Pick what to play</p>
-    <button class="modalBtn primary" data-mode="boss">👹  BOSS RUSH</button>
-    <button class="modalBtn"         data-mode="pvp">⚔  VS AI DUEL</button>
-    <button class="modalBtn"         data-mode="tut">★  TUTORIAL · LEARN</button>
-    <button class="modalBtn"         data-mode="3d"  style="background:linear-gradient(180deg,#aa66ff,#5533aa);">⬢  3D MODE  (BETA)</button>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:6px 4px 12px;">
+      <button class="navBtn bossClr"  data-mode="boss"><div class="ring"><canvas data-navicon="boss" width="72" height="72"></canvas></div><div class="lbl">BOSSES</div><div class="ribbon">HARD</div></button>
+      <button class="navBtn pvpClr"   data-mode="pvp"><div class="ring"><canvas data-navicon="pvp"  width="72" height="72"></canvas></div><div class="lbl">VS AI</div><div class="ribbon">NEW</div></button>
+      <button class="navBtn tutClr"   data-mode="tut"><div class="ring"><canvas data-navicon="tut"  width="72" height="72"></canvas></div><div class="lbl">LEARN</div></button>
+      <button class="navBtn shipsClr" data-mode="3d"><div class="ring"><canvas data-navicon="ships" width="72" height="72"></canvas></div><div class="lbl">3D</div><div class="ribbon">BETA</div></button>
+    </div>
   `);
+  paintHubNavIcons();   // re-paints every data-navicon canvas, including the ones we just inserted
   hubModalBox.querySelectorAll('button[data-mode]').forEach(b=>{
     b.onclick = ()=>{
       const m = b.getAttribute('data-mode');
@@ -535,11 +543,23 @@ function openAccountModal(){
       }
     </div>
     <p style="color:#7ea8d4;text-align:center;font-size:11px;letter-spacing:2px;margin:10px 0 6px;">MORE</p>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-      <button class="modalBtn" data-acct="settings">⚙  SETTINGS</button>
-      <button class="modalBtn" data-acct="awards">🏆  AWARDS  ${achvCount?`<span style="color:#ffea00">·${achvCount}</span>`:''}</button>
-      <button class="modalBtn" data-acct="stats">📊  STATS</button>
-      <button class="modalBtn" data-acct="prestige">★  PRESTIGE</button>
+    <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:10px;padding:4px;">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+        <button class="sideBtn" data-acct="settings" style="--c1:#3aa0ff;"><span>⚙</span></button>
+        <div style="font-size:10px;color:#9ec5ff;letter-spacing:1px;font-weight:900;">SETTINGS</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+        <button class="sideBtn" data-acct="awards" style="--c1:#ffaa00;position:relative;"><span>🏆</span>${achvCount?`<span class="badge">${achvCount}</span>`:''}</button>
+        <div style="font-size:10px;color:#9ec5ff;letter-spacing:1px;font-weight:900;">AWARDS</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+        <button class="sideBtn" data-acct="stats" style="--c1:#aa66ff;"><span>📊</span></button>
+        <div style="font-size:10px;color:#9ec5ff;letter-spacing:1px;font-weight:900;">STATS</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+        <button class="sideBtn" data-acct="prestige" style="--c1:#ffaa00;"><span>★</span></button>
+        <div style="font-size:10px;color:#9ec5ff;letter-spacing:1px;font-weight:900;">PRESTIGE</div>
+      </div>
     </div>
   `);
   // Wire claim button if present
