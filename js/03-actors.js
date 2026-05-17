@@ -476,12 +476,19 @@ function fire(p, weapon, opts={}){
       push(b);
     }
   } else if(w.id==='flame'){
-    // Wide cone of short-lived flame particles, very high fire rate
+    // Wide cone of short-lived flame particles, very high fire rate.
+    // Two-tone (red+amber by default, gold pair when mastered) so the
+    // stream has visible variation. The hardcoded #ff5500/#ffaa00 in
+    // the old code bypassed the mastery goldenise override at the top
+    // of fire() — that's why PLASMA FLAME stayed orange while every
+    // other weapon went gold on a mastered ship.
+    const flameA = w.draw === '#ffea00' ? '#ffea00' : '#ff5500';
+    const flameB = w.draw === '#ffea00' ? '#ffd700' : '#ffaa00';
     const n = 4 + (ms||0);
     for(let i=0;i<n;i++){
       const a = ang + (Math.random()-0.5)*0.55;
       const sp = w.speed*(0.7+Math.random()*0.5);
-      const b = B(fx,fy,Math.cos(a)*sp,Math.sin(a)*sp,dmg,Math.random()<0.5?'#ff5500':'#ffaa00',rand(2,4),false);
+      const b = B(fx,fy,Math.cos(a)*sp,Math.sin(a)*sp,dmg,Math.random()<0.5?flameA:flameB,rand(2,4),false);
       b.life = 30; // short range
       b.flame = true;
       push(b);
