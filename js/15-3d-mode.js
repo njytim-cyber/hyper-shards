@@ -1961,6 +1961,15 @@ function stop3DMode(){
   if(canvas) canvas.style.display = 'none';
   const hud = _3d_hud(); if(hud) hud.style.display = 'none';
   const wrap = document.getElementById('wrap'); if(wrap) wrap.style.display = '';
+  // === Restore inline display:'' on every 2D HUD element start3DMode
+  // set to 'none'. Without these clears, the inline display:none beats
+  // the CSS class rules (#touch.on, #hud, #hudBottom defaults) → touch
+  // controls (joystick, fire, ability, weapon, pause, consumables) all
+  // stay invisible forever after the first 3D session.
+  const touchEl = document.getElementById('touch');     if(touchEl) touchEl.style.display = '';
+  const hud2d   = document.getElementById('hud');       if(hud2d)   hud2d.style.display   = '';
+  const hudBot  = document.getElementById('hudBottom'); if(hudBot)  hudBot.style.display  = '';
+  const overlay = document.getElementById('overlay');   if(overlay) overlay.style.display = '';
   if(typeof showMenu === 'function') showMenu('menuMain');
   if(typeof setMusicMode === 'function') setMusicMode('menu');
 }
