@@ -1288,7 +1288,8 @@
   body.is-phone .navBtn[data-nav="boss"],
   body.is-phone .navBtn[data-nav="pvp"],
   body.is-phone .navBtn[data-nav="tut"],
-  body.is-phone .navBtn[data-nav="3d"]{ display:none; }
+  body.is-phone .navBtn[data-nav="3d"],
+  body.is-phone .navBtn[data-nav="mp"]{ display:none; }
   body.is-phone .navBtn[data-nav="modes"]{ display:flex; }
   /* On every non-phone form factor the MODES button is hidden — the
      individual mode buttons cover its role. */

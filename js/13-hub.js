@@ -448,6 +448,7 @@ document.querySelectorAll('[data-nav]').forEach(b=>{
     else if(id==='ships') { showMenu('menuShop'); shopTab='skin'; document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.getAttribute('data-tab')==='skin')); renderShop(); }
     else if(id==='tut')   showMenu('menuTut');
     else if(id==='3d')    { if(typeof start3DMode === 'function') start3DMode(); }
+    else if(id==='mp')    { if(typeof openMpLobby === 'function') openMpLobby(); }
     else if(id==='modes') openModesModal();
   };
 });
