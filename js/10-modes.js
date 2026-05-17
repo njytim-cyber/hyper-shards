@@ -294,7 +294,8 @@ function startTutorial(){
   state.diff='easy';
   Object.assign(state, {
     enemies:[], bullets:[], ebullets:[], particles:[], shards:[], powerups:[], boss:null,
-    score:0, earnedThisRun:0, weaponIdx:0, fx:{rapid:0,dmg:0,slow:0}
+    score:0, earnedThisRun:0, weaponIdx:0, fx:{rapid:0,dmg:0,slow:0,super:0},
+    level:1, xpGoal:800
   });
   if(typeof resetKeys==='function') resetKeys();
   player = makePlayer({maxHp:6});

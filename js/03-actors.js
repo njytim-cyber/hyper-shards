@@ -6,7 +6,12 @@ function makePlayer(opts={}){
   const u = save.upgrades;
   const skin = SKINS.find(s=>s.id===save.skin) || SKINS[0];
   const baseHp = (DIFFICULTY[state.diff]||DIFFICULTY.medium).hpStart;
-  const maxHp = (opts.maxHp != null ? opts.maxHp : baseHp) + u.hp;
+  // Prestige perks: +1 starting hull per prestige level (capped) and
+  // a flat +5%/lvl damage bonus on top of the PLASMA YIELD upgrade.
+  const _hasPerks = (typeof PRESTIGE_PERKS !== 'undefined');
+  const prestigeHp  = _hasPerks ? PRESTIGE_PERKS.hpBonus(save.prestige)  : 0;
+  const prestigeDmg = _hasPerks ? PRESTIGE_PERKS.dmgBonus(save.prestige) : 0;
+  const maxHp = (opts.maxHp != null ? opts.maxHp : baseHp) + u.hp + prestigeHp;
   return {
     x: opts.x ?? W/2, y: opts.y ?? H-110,
     vx:0, vy:0,
@@ -14,7 +19,7 @@ function makePlayer(opts={}){
     cd:0, inv:0,
     skin,
     speedMul: 1 + 0.08*u.speed,
-    dmgMul: 1 + 0.15*u.dmg,
+    dmgMul: 1 + 0.15*u.dmg + prestigeDmg,
     fireMul: 1/(1+0.10*u.fire),
     regen: u.shield,         // hearts per 12 seconds per level
     regenAcc: 0,
@@ -206,6 +211,172 @@ function triggerAbility(){
   player.abilityCd = ab.cd;
   achievement('FIRST ABILITY');
 }
+// ============================================================
+// LEVEL-UP + SUPER ABILITY
+// ============================================================
+// Per-run leveling system. Score crossing state.xpGoal triggers a
+// level-up burst: gem particles, +10 lifetime gems, screen flash, sting
+// SFX, and every 3rd level grants a super-coin. Designed to fire many
+// times per run (every ~800 score) so the dopamine hits keep landing.
+function tryLevelUp(){
+  if(state.phase!=='play' && state.phase!=='tutorial') return;
+  // Loop in case a single fat-score event (a boss kill on key:1 super)
+  // crosses two thresholds at once — you should still see two pops.
+  while(state.score >= state.xpGoal){
+    state.level = (state.level||1) + 1;
+    // Linear ramp keeps the cadence steady deep into the run.
+    state.xpGoal += 800;
+    save.gems = (save.gems||0) + 10;
+    const wasMilestone = (state.level % 3) === 0;
+    if(wasMilestone) save.superCoins = (save.superCoins||0) + 1;
+    persist();
+    // Visual: gem fountain at the player + brief screen shake
+    if(player){
+      const cnt = wasMilestone ? 50 : 28;
+      for(let i=0;i<cnt;i++){
+        const a = Math.random()*Math.PI*2;
+        const sp = rand(2, 7);
+        state.particles.push({
+          x: player.x, y: player.y,
+          vx: Math.cos(a)*sp, vy: Math.sin(a)*sp - 1,
+          life: rand(40, 70),
+          col: i%3===0 ? '#ffea00' : (i%3===1 ? '#00f7ff' : '#ff66cc'),
+          size: rand(2, 4),
+        });
+      }
+    }
+    state.shake = Math.max(state.shake, wasMilestone ? 14 : 8);
+    state.hitStop = Math.max(state.hitStop, wasMilestone ? 90 : 40);
+    if(typeof sfx === 'function') sfx(wasMilestone ? 'achieve' : 'power');
+    if(typeof haptic === 'function') haptic(wasMilestone ? [30,40,30] : 25);
+    toast(wasMilestone
+      ? '★ LEVEL '+state.level+' · +10 ◆ · +1 ✦ SUPER'
+      : '★ LEVEL '+state.level+' · +10 ◆');
+  }
+}
+
+// === ULTIMATE (E key) — unlocked per-skin via mastery XP ===========
+// Mirrors _3d_triggerUltimate() but uses 2D systems: state.enemies,
+// state.boss, state.blackHole, player.fxBerserk, player.inv. Same
+// four `kind`s defined in ULTIMATES (01-core.js):
+//   • nova    — destroys every enemy on screen + chunk-damages the boss
+//   • rage    — 8 s of damage+fire-rate boost (reuses fxBerserk)
+//   • rift    — spawns a 6 s black hole at the screen centre that
+//               pulls + damages everything
+//   • rebirth — instant heal-to-full + 6 s invuln
+// Cooldown comes from the ultimate's `cd` (typically 25–45 s) and is
+// tracked on state.ultCd; ticked down each frame in 08-update.js.
+function triggerUltimate(){
+  if(!player) return;
+  if(state.phase!=='play'){ toast('ULT · only during a run'); return; }
+  if(typeof save==='undefined' || !save) return;
+  const skinId = save.skin || 'default';
+  if(typeof isSkinMastered !== 'function' || !isSkinMastered(skinId)){
+    const need = (typeof getSkinMasteryXp==='function') ? getSkinMasteryXp(skinId) : '???';
+    toast('ULT LOCKED · master this skin (' + need + ' XP)');
+    return;
+  }
+  if((state.ultCd||0) > 0){
+    toast('ULT · ' + (state.ultCd/1000).toFixed(1) + 's');
+    return;
+  }
+  const ult = (typeof getUltimate==='function') ? getUltimate(skinId) : null;
+  if(!ult) return;
+  state.ultCd = ult.cd;
+  sfx('ability');
+
+  switch(ult.kind){
+    case 'rage': {
+      // 8 s of damage boost (fxBerserk is read by fire() for the dmg+fire-rate buff)
+      player.fxBerserk = 8000;
+      state.shake = Math.max(state.shake, 18);
+      for(let i=0;i<60;i++){
+        state.particles.push({x:player.x,y:player.y,vx:rand(-5,5),vy:rand(-5,5),life:50,col:player.skin.glow,size:3});
+      }
+      toast('★ ' + ult.name + ' · 8s RAGE');
+      break;
+    }
+    case 'rebirth': {
+      player.hp = player.maxHp;
+      player.inv = Math.max(player.inv, 6000);
+      state.shake = Math.max(state.shake, 16);
+      // Healing ring particles
+      for(let i=0;i<48;i++){
+        const ang = (i/48)*Math.PI*2;
+        state.particles.push({
+          x:player.x + Math.cos(ang)*30, y:player.y + Math.sin(ang)*30,
+          vx:Math.cos(ang)*2, vy:Math.sin(ang)*2, life:60, col:'#00ff88', size:3
+        });
+      }
+      toast('★ ' + ult.name + ' · FULL REPAIR + 6s INVULN');
+      break;
+    }
+    case 'rift': {
+      // Black hole at the screen centre — existing 2D code in 08-update
+      // already handles attraction + damage when state.blackHole is set.
+      state.blackHole = { x: W/2, y: H/2 - 80, life: 6000, t: 0, r: 200 };
+      state.shake = 24;
+      toast('★ ' + ult.name + ' · 6s RIFT');
+      break;
+    }
+    case 'nova':
+    default: {
+      // Wipe every enemy on screen and chunk-damage the boss.
+      state.shake = 32;
+      for(const e of state.enemies){
+        e.hp = 0;     // dead-enemy loop in 08-update will explode + score them
+        for(let i=0;i<8;i++) state.particles.push({x:e.x,y:e.y,vx:rand(-3,3),vy:rand(-3,3),life:40,col:'#'+ult.color.toString(16).padStart(6,'0'),size:2});
+      }
+      if(state.boss){
+        state.boss.hp -= 200;        // big chunk damage (full kills tier-1)
+        for(let i=0;i<40;i++) state.particles.push({x:state.boss.x,y:state.boss.y,vx:rand(-6,6),vy:rand(-6,6),life:50,col:'#ffea00',size:3});
+      }
+      // Big shockwave at the player too — pure visual but sells the moment
+      for(let i=0;i<80;i++){
+        const ang = Math.random()*Math.PI*2, sp = 4+Math.random()*6;
+        state.particles.push({x:player.x,y:player.y,vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp,life:60,col:'#ffea00',size:3});
+      }
+      toast('★ ' + ult.name + ' · FIELD CLEARED');
+      break;
+    }
+  }
+}
+
+// Press 9 (or tap SUPER button). Spends one super-coin to grant the
+// player a 15-second mega-buff: 2× damage, 2× fire rate, 1.4× speed,
+// full boost fuel, +1 heart, and a golden aura in render(). The buff
+// is applied via state.fx.super which existing fire()/movement code
+// reads alongside rapid/dmg fx.
+function triggerSuperAbility(){
+  if(!player) return;
+  if(state.phase!=='play'){ toast('SUPER · only during a run'); return; }
+  if(state.fx.super > 0){ toast('SUPER · already active'); return; }
+  if((save.superCoins||0) <= 0){ toast('SUPER · need ✦ super-coin'); return; }
+  save.superCoins--;
+  persist();
+  state.fx.super = 15000;          // 15s
+  // Quality-of-life: top off boost fuel + give 1 heart back.
+  player.boostFuel = 100 + 25*save.upgrades.boost;
+  if(player.hp < player.maxHp) player.hp = Math.min(player.maxHp, player.hp + 1);
+  // Big radial burst at the player so the activation reads visually.
+  for(let i=0;i<80;i++){
+    const a = Math.random()*Math.PI*2, sp = rand(3, 9);
+    state.particles.push({
+      x: player.x, y: player.y,
+      vx: Math.cos(a)*sp, vy: Math.sin(a)*sp,
+      life: rand(40, 80),
+      col: i%2 ? '#ffea00' : '#fff7c0',
+      size: rand(2, 4),
+    });
+  }
+  state.shake = Math.max(state.shake, 18);
+  state.hitStop = Math.max(state.hitStop, 70);
+  if(typeof sfx === 'function') sfx('achieve');
+  if(typeof haptic === 'function') haptic([40, 60, 40, 80]);
+  toast('✦ SUPER · 15s · 2× DMG · 2× FIRE · BOOSTED');
+  achievement('SUPER PILOT');
+}
+
 function abilityRadialDamage(x,y,r,dmg,col){
   for(const e of state.enemies){
     if(Math.hypot(e.x-x,e.y-y) < r){
@@ -248,9 +419,19 @@ function curWeapon(){
 
 function fire(p, weapon, opts={}){
   if(p.cd>0) return;
-  const w = weapon;
+  // GOLDENISE the weapon's bullet colour when the firing player's
+  // equipped skin is mastered. Clone the weapon def with a gold
+  // `draw` colour so every push(B(... w.draw ...)) below uses gold
+  // without a single-site edit per weapon type. Damage / cooldown /
+  // speed are untouched — purely cosmetic. AI shooters are skipped.
+  const _isMaster = (p === player)
+    && typeof save !== 'undefined' && save
+    && typeof isSkinMastered === 'function'
+    && isSkinMastered(save.skin || 'default');
+  const w = _isMaster ? Object.assign({}, weapon, { draw: '#ffea00' }) : weapon;
   let cdMul = p.fireMul;
   if(state.fx.rapid>0 && p===player) cdMul *= 0.45;
+  if(state.fx.super>0 && p===player) cdMul *= 0.5;
   p.cd = w.cd * cdMul;
   // Track shots-fired for end-of-run accuracy. One trigger pull counts
   // as one shot, regardless of multishot/spread/cluster — we want the
@@ -258,6 +439,7 @@ function fire(p, weapon, opts={}){
   if(p===player && state.stats) state.stats.shotsFired++;
   let dmg = w.dmg * (p.dmgMul||1);
   if(state.fx.dmg>0 && p===player) dmg *= 2;
+  if(state.fx.super>0 && p===player) dmg *= 2;
   if(p===player && p.fxBerserk>0) dmg *= 2;
 
   const ang = p.facing ?? -Math.PI/2;

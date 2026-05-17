@@ -15,6 +15,41 @@
 <body>
 <div id="wrap"><canvas id="game" width="1100" height="720"></canvas></div>
 
+<!-- Real 3D mode canvas — covers the viewport while a Three.js scene is
+     active, hidden by default. The 2D game keeps its own canvas above. -->
+<canvas id="game3d" style="display:none;position:fixed;inset:0;width:100vw;height:100vh;z-index:1;background:#02030a;"></canvas>
+
+<!-- 3D-mode HUD overlay (kept lightweight; the WebGL canvas owns the
+     scene, this is just the score / hp / "QUIT" affordance). -->
+<div id="hud3d" style="display:none;position:fixed;top:0;left:0;right:0;z-index:5;padding:14px 20px;color:#cfe9ff;font-family:'Orbitron','Bebas Neue',Arial,sans-serif;letter-spacing:3px;font-weight:900;pointer-events:none;display:none;">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;">
+    <div>
+      <div style="font-size:11px;color:#7ea8d4;">HULL</div>
+      <div id="hud3dHp" style="font-size:20px;color:#ff3344;text-shadow:0 0 10px #ff334488;">●●●●●</div>
+    </div>
+    <div style="text-align:center;">
+      <div style="font-size:11px;color:#7ea8d4;">SCORE</div>
+      <div id="hud3dScore" style="font-size:24px;color:#ffea00;text-shadow:0 0 10px #ffea0088;">0</div>
+      <div id="hud3dCombo" style="margin-top:2px;font-size:14px;color:#ff66cc;text-shadow:0 0 8px #ff66cc;visibility:hidden;">×1 COMBO</div>
+      <div style="margin-top:4px;font-size:10px;color:#9ec5ff;">
+        <span id="hud3dWeapon">PLASMA</span>
+        &nbsp;·&nbsp;
+        <span id="hud3dAbility">Q · READY</span>
+        &nbsp;·&nbsp;
+        <span id="hud3dUltimate" style="color:#888;">E · LOCKED</span>
+      </div>
+      <div id="hud3dMastery" style="margin-top:3px;font-size:9px;color:#9ec5ff;letter-spacing:2px;">
+        MASTERY <span id="hud3dMasteryNum">0/0</span>
+      </div>
+    </div>
+    <button id="hud3dQuit" style="pointer-events:auto;background:linear-gradient(180deg,#ff3344,#aa1122);color:#fff;border:2px solid #050a18;border-radius:6px;padding:6px 14px;font-family:inherit;font-size:11px;letter-spacing:2px;font-weight:900;cursor:pointer;box-shadow:0 3px 0 #050a18;">◀ QUIT</button>
+  </div>
+  <!-- Centre crosshair (mouse-aim cue — actual aim is the pointer position) -->
+  <div style="position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:32px;height:32px;border:2px solid #00eaff;border-radius:50%;box-shadow:0 0 12px #00eaff;pointer-events:none;opacity:.5;">
+    <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:4px;height:4px;background:#00eaff;border-radius:50%;"></div>
+  </div>
+</div>
+
 <!-- HUD -->
 <div id="hud">
   <div class="panel">
@@ -29,7 +64,7 @@
     <div style="margin-top:6px;"><span class="label" style="display:inline">ABILITY <span class="key">Q</span></span></div>
     <div id="abilityBox" style="margin-top:3px;background:#102040;border:1px solid #3a8acc;border-radius:6px;padding:4px 8px;min-width:140px;font-size:11px;">
       <span id="abilityName" style="color:#ffea00;letter-spacing:2px;">WARP DASH</span>
-      <div class="bar" style="margin-top:3px;height:5px;"><span id="abilityBar" style="width:100%;background:linear-gradient(90deg,#ffea00,#00eaff);"></span></div>
+      <div class="bar" style="margin-top:3px;height:5px;"><span id="abilityBar" style="width:100%;background:linear-gradient(90deg,#ff3344,#ffaa00,#ffea00,#00ff88,#00eaff,#aa66ff,#ff66cc);"></span></div>
     </div>
   </div>
   <div class="panel" style="text-align:right">
@@ -51,6 +86,11 @@
 <div id="achievement">
   <div class="label">★ ACHIEVEMENT UNLOCKED</div>
   <div class="name" id="achName">FIRST BLOOD</div>
+  <!-- Reward line — populated by achievement() in 07-loop.js with the
+       per-achievement shards + skin XP from the ALL_ACHIEVEMENTS table.
+       Hidden when empty (set during boot below so the demo doesn't
+       show "+0 ◈"). -->
+  <div class="reward" id="achReward" style="margin-top:4px;color:#ffea00;font-size:13px;letter-spacing:2px;font-weight:900;text-shadow:0 0 10px #ffea0088;"></div>
 </div>
 <!-- Touch controls -->
 <div id="touch">
@@ -131,7 +171,13 @@
 
     <!-- TOP BAR -->
     <div id="hubTop">
-      <div class="pilotBadge">
+      <!-- Pilot badge doubles as the ACCOUNT button on phone (where the
+           top-right shardBar + the 5 side buttons are hidden). Tapping
+           it opens a unified panel: pilot info + shards + daily reward
+           + quick-access to settings / awards / stats / prestige.
+           role="button" makes it focusable; click handler wired in
+           13-hub.js. -->
+      <div class="pilotBadge" id="hubAccountBtn" role="button" tabindex="0">
         <div class="lvl" id="hubLvl">1</div>
         <div class="info">
           <span class="name" id="hubName">PILOT</span>
@@ -139,7 +185,11 @@
             <div class="xpbar"><span id="hubXpBar" style="width:30%"></span></div>
             <span class="num" id="hubXpNum">0/100</span>
           </div>
+          <!-- Phone-only shards line, populated by updateHubInfo() —
+               desktop / tablet keep the separate top-right shardBar. -->
+          <div class="phoneShards"><span class="gem">◈</span> <span id="hubPilotShards">0</span></div>
         </div>
+        <span class="acctBadge" id="hubAccountBadge">!</span>
       </div>
       <div class="eventRibbon">
         <div class="t">VOID INCURSION</div>
@@ -174,9 +224,9 @@
         <button class="sideBtn" id="hubBtnLeaderboard"><span>📊</span></button>
         <div class="sideLbl">STATS</div>
       </div>
-      <div class="sideSlot" style="--c1:#ff3344">
-        <button class="sideBtn" id="hubBtnReset"><span>↺</span></button>
-        <div class="sideLbl">RESET</div>
+      <div class="sideSlot" style="--c1:#ffaa00">
+        <button class="sideBtn" id="hubBtnReset"><span>★</span><span class="badge" id="hubPrestigeBadge" style="display:none">!</span></button>
+        <div class="sideLbl" id="hubResetLbl">PRESTIGE</div>
       </div>
     </div>
 
@@ -199,6 +249,16 @@
       <button class="navBtn bossClr" data-nav="boss"><div class="ring"><span class="shine"></span><canvas data-navicon="boss" width="84" height="84"></canvas></div><div class="lbl">BOSSES</div><div class="ribbon">HARD</div></button>
       <button class="navBtn pvpClr" data-nav="pvp"><div class="ring"><span class="shine"></span><canvas data-navicon="pvp" width="84" height="84"></canvas></div><div class="lbl">VS AI</div><div class="ribbon">NEW</div></button>
       <button class="navBtn playClr big" data-nav="play"><div class="ring"><span class="shine"></span><canvas data-navicon="play" width="120" height="120"></canvas></div><div class="lbl">PLAY</div></button>
+      <!-- 3D button uses the "ships" navicon (the plane mascot) — the
+           "play" navicon was repurposed to a play-triangle when the
+           bottom-nav icons were redesigned, so the 3D button has to
+           opt back into the spaceship art explicitly. -->
+      <button class="navBtn shipsClr" data-nav="3d"><div class="ring"><span class="shine"></span><canvas data-navicon="ships" width="84" height="84"></canvas></div><div class="lbl">3D</div><div class="ribbon">BETA</div></button>
+      <!-- MODES — phone-only consolidated entry point. Hidden on
+           desktop/tablet by CSS (where the individual BOSSES/VS AI/
+           LEARN/3D buttons stay visible); revealed on body.is-phone.
+           Opens a submenu modal listing the absorbed game modes. -->
+      <button class="navBtn bossClr modesBtn" data-nav="modes"><div class="ring"><span class="shine"></span><canvas data-navicon="boss" width="84" height="84"></canvas></div><div class="lbl">MODES</div></button>
       <button class="navBtn shopClr" data-nav="shop"><div class="ring"><span class="shine"></span><canvas data-navicon="shop" width="84" height="84"></canvas></div><div class="lbl">SHOP</div></button>
       <button class="navBtn tutClr" data-nav="tut"><div class="ring"><span class="shine"></span><canvas data-navicon="tut" width="84" height="84"></canvas></div><div class="lbl">LEARN</div></button>
     </div>
@@ -240,6 +300,7 @@
       <button class="btn diff" data-diff="easy">★ EASY<small>Slower enemies, weaker hits</small></button>
       <button class="btn diff" data-diff="medium">★★ MEDIUM<small>Balanced challenge</small></button>
       <button class="btn diff" data-diff="hard">★★★ HARD<small>Faster, stronger, more shards</small></button>
+      <button class="btn diff" data-diff="elite" id="btnDiffElite" style="display:none;background:linear-gradient(180deg,#ff3344,#aa1122);">★★★★ ELITE<small>Prestige tier · brutal · 2.4× shards</small></button>
     </div>
     <div class="btnRow"><button class="btn small" data-go="menuMain">◀ BACK</button></div>
   </div>
@@ -267,6 +328,7 @@
       <div class="tab" data-tab="skin">SKINS</div>
       <div class="tab" data-tab="consume">CONSUMABLES</div>
       <div class="tab" data-tab="special">SPECIAL</div>
+      <div class="tab" data-tab="theme">THEMES</div>
     </div>
     <div id="shopScroll"><div class="grid" id="shopGrid"></div></div>
     <div class="btnRow" style="margin-top:14px"><button class="btn" id="closeShop">◀ BACK</button></div>
@@ -338,6 +400,10 @@ if ('serviceWorker' in navigator) {
   });
 }
 </script>
+<!-- Three.js (UMD build via CDN) — loaded BEFORE 15-3d-mode.js so the
+     module can reference the global THREE. Placed after the core game
+     scripts so a CDN failure can't prevent the 2D game from booting. -->
+<script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
 <script src="js/01-core.js"></script>
 <script src="js/02-input.js"></script>
 <script src="js/03-actors.js"></script>
@@ -352,5 +418,6 @@ if ('serviceWorker' in navigator) {
 <script src="js/12-icons.js"></script>
 <script src="js/13-hub.js"></script>
 <script src="js/14-boss-arena.js"></script>
+<script src="js/15-3d-mode.js"></script>
 </body>
 </html>

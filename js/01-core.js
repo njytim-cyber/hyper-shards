@@ -96,8 +96,65 @@ const defaultSave = () => ({
   specials: { autoRepair:false, drone:false, shockwave:false, magnetMax:false },
   skins: { default:true, crimson:false, void:false, solar:false, prism:false, eclipse:false, phoenix:false, glacier:false, neon:false },
   skin: 'default',
-  hubBg: 'nebula'
+  hubBg: 'nebula',
+  // Owned hub backgrounds. The starter palette is granted free; every
+  // other theme must be purchased from the shop's THEMES tab. Equipping
+  // a theme without ownership is a no-op (UI guards it, but the data
+  // model also enforces it via this map).
+  hubBgs: { nebula:true },
+  // Per-skin mastery XP — accumulated when killing things while a skin
+  // is equipped. Reaching the skin's mastery threshold (see
+  // getSkinMasteryXp() below) unlocks that skin's ULTIMATE ability and
+  // recolours the ship in 3D mode (top-tier skin "celestial" turns
+  // pure gold). Map keys are skin ids; values are integers.
+  skinXp: {},
+  // Prestige level. Spent through the RESET-turned-PRESTIGE flow once
+  // the player meets the requirement gate (shards + skins owned + best
+  // round). Each level is a permanent cumulative buff (see PRESTIGE_PERKS
+  // below) and unlocks ELITE difficulty at level >= 1.
+  prestige: 0,
+  // Easter-egg / secret-discovery tracking. Each entry is set to true
+  // when the player finds that secret. Currently used by the hidden
+  // top-left button in the settings modal.
+  foundSecrets: {}
 });
+
+// Prestige perks — derived from save.prestige, applied at gameplay
+// boundary points (credit gain, player init, difficulty unlock). Kept
+// as pure functions so they can be unit-tested and so the UI can
+// preview "next level" values without mutating state.
+const PRESTIGE_PERKS = {
+  // +25% shards per pickup per level (cap at +200% so it can't run away).
+  shardMul:    (n)=> 1 + 0.25 * Math.min(n||0, 8),
+  // +1 starting hull per level (cap +5 so easy mode doesn't go silly).
+  hpBonus:     (n)=> Math.min(n||0, 5),
+  // +5% damage per level (cap +50%).
+  dmgBonus:    (n)=> 0.05 * Math.min(n||0, 10),
+  // ELITE difficulty unlocks at prestige >= 1.
+  eliteUnlocked:(n)=> (n||0) >= 1,
+};
+// Prestige requirement gate — must satisfy ALL three to ascend. Scales
+// each level so subsequent prestiges are meaningful goals, not free
+// resets.
+function prestigeRequirements(){
+  const lvl = (save && save.prestige) || 0;
+  return {
+    shards:   2000 + lvl * 1500,                        // 2000, 3500, 5000, …
+    skins:    Math.min(3 + lvl, (SKINS||[]).length||9), // 3, 4, 5, … capped
+    bestRound:10 + lvl * 5,                              // 10, 15, 20, …
+  };
+}
+function prestigeProgress(){
+  const need = prestigeRequirements();
+  const ownedSkins = Object.values((save && save.skins) || {}).filter(Boolean).length;
+  return {
+    need,
+    have: { shards: (save&&save.credits)||0, skins: ownedSkins, bestRound: (save&&save.bestRound)||1 },
+    ready: ((save&&save.credits)||0) >= need.shards
+        && ownedSkins >= need.skins
+        && ((save&&save.bestRound)||1) >= need.bestRound,
+  };
+}
 let save = loadSave();
 function loadSave(){
   try{
@@ -105,7 +162,7 @@ function loadSave(){
     if(!raw) return defaultSave();
     const s = JSON.parse(raw);
     const d = defaultSave();
-    return { ...d, ...s, upgrades:{...d.upgrades,...(s.upgrades||{})}, skins:{...d.skins,...(s.skins||{})} };
+    return { ...d, ...s, upgrades:{...d.upgrades,...(s.upgrades||{})}, skins:{...d.skins,...(s.skins||{})}, hubBgs:{...d.hubBgs,...(s.hubBgs||{})}, foundSecrets:{...d.foundSecrets,...(s.foundSecrets||{})}, skinXp:{...d.skinXp,...(s.skinXp||{})} };
   }catch(e){ return defaultSave(); }
 }
 // localStorage failure modes worth handling:
@@ -308,6 +365,99 @@ const SKINS = [
   { id:'celestial',name:'CELESTIAL',cost:3000,color:'#ffeebb', accent:'#ffd700', glow:'#fff7c0', tagline:'Legendary divine plating. Glows softly.',
     ability:{ name:'DIVINE BEAM',   cd:28000, desc:'A massive forward beam vaporizes all in a line.' } },
 ];
+
+// ============================================================
+// SKIN MASTERY + ULTIMATES
+// ============================================================
+// Each skin earns its own XP pool while equipped (see addSkinXp). Hit
+// the threshold below and that skin unlocks its ULTIMATE — a far more
+// powerful one-shot ability triggered on E in 3D mode. Higher-tier
+// skins need more XP to master (the climb to celestial is the longest
+// goal in the game). Visual: mastered skins get a gold-tinted overlay
+// on their hull; the top-tier skin "celestial" turns pure gold.
+//
+// All thresholds are scaled XP (~10 per kill, +100 per boss); reaching
+// celestial mastery is a long-term goal (~500+ kills with that skin).
+const MASTERY_XP_BY_TIER = [
+  /* default   */  200,
+  /* crimson   */  400,
+  /* void      */  600,
+  /* solar     */  800,
+  /* glacier   */ 1000,
+  /* neon      */ 1200,
+  /* toxic     */ 1400,
+  /* prism     */ 1600,
+  /* royal     */ 1800,
+  /* phoenix   */ 2100,
+  /* shadow    */ 2400,
+  /* eclipse   */ 2700,
+  /* aurora    */ 3200,
+  /* inferno   */ 3800,
+  /* celestial */ 5000,
+];
+function getSkinMasteryXp(skinId){
+  const idx = (typeof SKINS !== 'undefined') ? SKINS.findIndex(s => s.id === skinId) : -1;
+  if(idx < 0) return 1000;
+  return MASTERY_XP_BY_TIER[idx] || 5000;
+}
+function getSkinXp(skinId){
+  return (save && save.skinXp && save.skinXp[skinId]) || 0;
+}
+function isSkinMastered(skinId){
+  return getSkinXp(skinId) >= getSkinMasteryXp(skinId);
+}
+function addSkinXp(skinId, amount){
+  if(!save) return;
+  if(!save.skinXp) save.skinXp = {};
+  const wasMastered = isSkinMastered(skinId);
+  save.skinXp[skinId] = (save.skinXp[skinId] || 0) + (amount|0);
+  // First-time mastery: side-effect for the UI to react to.
+  if(!wasMastered && isSkinMastered(skinId)){
+    if(typeof toast === 'function') toast('★ MASTERED · ULTIMATE UNLOCKED');
+    if(typeof sfx === 'function') sfx('achieve');
+  }
+  // Persist eagerly — losing XP across a crash would feel terrible.
+  if(typeof persist === 'function') persist();
+}
+
+// Per-skin ULTIMATE definitions. `kind` selects the visual + gameplay
+// effect; multiple skins share kinds with distinct names + colours.
+//
+//   • nova      — destroy every asteroid on screen with a colossal
+//                 expanding shockwave + particle storm.
+//   • rage      — 8s of ×3 fire rate + ×2 damage; ship tints accent.
+//   • rift      — spawn 3 black-hole wells across the play area that
+//                 pull + damage everything for 6s.
+//   • rebirth   — instant heal-to-full + 6s invuln + cleanse particles.
+const ULTIMATES = {
+  default:   { name:'NOVA BURST',     cd:25000, kind:'nova',    color:0x00eaff },
+  crimson:   { name:'BERSERKER RAGE', cd:30000, kind:'rage',    color:0xff3355 },
+  void:      { name:'VOID RIFT',      cd:30000, kind:'rift',    color:0xaa55ff },
+  solar:     { name:'SOLAR FLARE',    cd:28000, kind:'nova',    color:0xffaa00 },
+  glacier:   { name:'CRYO IMPLOSION', cd:30000, kind:'rift',    color:0x88ddff },
+  neon:      { name:'PRISM CASCADE',  cd:28000, kind:'nova',    color:0x33ff88 },
+  toxic:     { name:'ACID STORM',     cd:30000, kind:'rift',    color:0xaaff00 },
+  prism:     { name:'RAINBOW STORM',  cd:32000, kind:'nova',    color:0xff00cc },
+  royal:     { name:'ROYAL DECREE',   cd:30000, kind:'rage',    color:0xffd700 },
+  phoenix:   { name:'PHOENIX REBORN', cd:35000, kind:'rebirth', color:0xff6600 },
+  shadow:    { name:'SHADOW STRIKE',  cd:28000, kind:'rage',    color:0xff0066 },
+  eclipse:   { name:'TOTAL ECLIPSE',  cd:38000, kind:'nova',    color:0xffffff },
+  aurora:    { name:'AURORA WAVE',    cd:32000, kind:'rebirth', color:0x88ffdd },
+  inferno:   { name:'INFERNO STORM',  cd:30000, kind:'rage',    color:0xff2200 },
+  celestial: { name:'DIVINE WRATH',   cd:45000, kind:'nova',    color:0xffd700 },
+};
+function getUltimate(skinId){
+  return ULTIMATES[skinId] || ULTIMATES.default;
+}
+
+// === Boss reward tables (shared between 2D survival + 3D mode) =========
+// Indexed 1..5 (index 0 unused). Hit a boss → award the tier's XP to
+// the player's currently equipped skin. Same values across both modes
+// so a tier-5 kill in the 2D game gives the same 1600 XP as 3D mode.
+const BOSS_XP_BY_TIER    = [0, 100, 300, 500, 1000, 1600];
+const BOSS_HP_BY_TIER    = [0,  20,  30,  45,   70,  100];
+const BOSS_SCORE_BY_TIER = [0, 250, 500, 800, 1500, 2500];
+const BOSS_SCALE_BY_TIER = [0, 1.0, 1.10, 1.20, 1.35, 1.55];
 // extend save defaults for new specials/weapons
 function ensureSaveCompat(){
   for(const w of SHOP_WEAPONS) if(save.weapons[w.id]===undefined) save.weapons[w.id] = (w.id==='single');
@@ -332,6 +482,10 @@ const DIFFICULTY = {
   easy:   { enemyHp:0.5, enemyDmg:1, enemySpd:0.6, fireRate:1.6, shardMul:1.0, hpStart:8 },
   medium: { enemyHp:0.8, enemyDmg:1, enemySpd:0.85,fireRate:1.2, shardMul:1.2, hpStart:6 },
   hard:   { enemyHp:1.2, enemyDmg:1, enemySpd:1.1, fireRate:0.9, shardMul:1.6, hpStart:4 },
+  // ELITE — unlocked by reaching prestige >= 1. Tougher enemies than
+  // HARD across the board, shorter cooldowns, but a fat shard payoff
+  // so the climb is worth it for prestige farmers.
+  elite:  { enemyHp:1.6, enemyDmg:2, enemySpd:1.3, fireRate:0.7, shardMul:2.4, hpStart:3 },
 };
 
 // ============================================================
@@ -355,6 +509,7 @@ addEventListener('keydown', e => {
   if(state.phase==='play'){
     if(k==='c') cycleWeapon();
     if(k==='q') triggerAbility();
+    if(k==='e') triggerUltimate();   // mastery-locked ultimate (see triggerUltimate in 03-actors.js)
     if(k==='p') pause();
     if(k==='escape') pause();
     if(k==='1') useConsumable('heal');

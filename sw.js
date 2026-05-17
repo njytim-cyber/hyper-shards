@@ -10,7 +10,7 @@
 //
 // Bumping CACHE_VERSION wipes stale shells on the next activate.
 
-const CACHE_VERSION = 'hs-shell-v2';
+const CACHE_VERSION = 'hs-shell-v16';
 const CACHE_AUDIO   = 'hs-audio-v1';
 
 // Files to pre-cache so the shell is fully offline-playable after first
@@ -37,6 +37,7 @@ const SHELL = [
   './js/12-icons.js',
   './js/13-hub.js',
   './js/14-boss-arena.js',
+  './js/15-3d-mode.js',
 ];
 
 self.addEventListener('install', (event) => {
@@ -57,13 +58,33 @@ self.addEventListener('activate', (event) => {
   })());
 });
 
-// Network-first with cache-fallback. Used for app shell (HTML/CSS/JS).
+// Returns true iff this response is safe to put() into the Cache API.
+// Skips:
+//   - opaque responses (cross-origin no-cors) — can't read body
+//   - non-200 ok responses (e.g., 304, redirects we shouldn't store)
+//   - 206 Partial Content — browsers issue Range requests for <audio>/
+//     <video> and the Cache API throws "Partial response unsupported"
+//     when you try to put a 206 into it. This is the bug the user hit:
+//     networkFirst on an audio range request crashed with that error.
+function _isCacheable(r, req){
+  if (!r) return false;
+  if (r.type === 'opaque' || r.type === 'opaqueredirect') return false;
+  if (r.status !== 200) return false;            // covers 206, 304, redirects
+  if (req && req.headers && req.headers.get && req.headers.get('range')) return false;
+  return true;
+}
+
+// Network-first with cache-fallback. Used for app shell (HTML/CSS/JS)
+// and for audio (where Range requests are common — see _isCacheable).
 async function networkFirst(req, cacheName) {
   try {
     const r = await fetch(req);
-    if (r && r.ok) {
+    if (_isCacheable(r, req)) {
       const c = await caches.open(cacheName);
-      c.put(req, r.clone());
+      // Still wrap in try/catch — quota errors, storage failures, and
+      // any other "put failed" reason shouldn't break the response we
+      // return to the page.
+      try { await c.put(req, r.clone()); } catch (e) { /* ignore */ }
     }
     return r;
   } catch {
@@ -83,9 +104,9 @@ async function cacheFirst(req, cacheName) {
   const cached = await caches.match(req);
   if (cached) return cached;
   const r = await fetch(req);
-  if (r && r.ok) {
+  if (_isCacheable(r, req)) {
     const c = await caches.open(cacheName);
-    c.put(req, r.clone());
+    try { await c.put(req, r.clone()); } catch (e) { /* ignore */ }
   }
   return r;
 }

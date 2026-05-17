@@ -248,6 +248,16 @@
   .item.skin .info p{margin:2px 0;font-size:11px;color:#7ea8d4;}
   .item.skin .actions{flex-shrink:0;text-align:right;}
   .item.skin .actions .price{display:block;color:#ffea00;margin-bottom:6px;font-size:12px;}
+  /* Hub-background theme cards — left-side palette swatch instead of an
+     iconBox, mirroring the skin card layout. */
+  .item.theme{display:flex;align-items:center;gap:14px;text-align:left;}
+  .item.theme .bgPreview{flex-shrink:0;position:relative;width:120px;height:70px;border:1px solid #1f4d7a;border-radius:4px;overflow:hidden;}
+  .item.theme .bgPreview .bgPreviewGlow{position:absolute;inset:0;display:block;pointer-events:none;}
+  .item.theme .info{flex:1;}
+  .item.theme .info h3{margin-bottom:4px;}
+  .item.theme .info p{margin:2px 0;font-size:11px;color:#7ea8d4;}
+  .item.theme .actions{flex-shrink:0;text-align:right;}
+  .item.theme .actions .price{display:block;color:#ffea00;margin-bottom:6px;font-size:12px;}
 
   .tabs{display:flex;gap:6px;margin:14px 0 6px;}
   .tab{background:#0a1430;border:1px solid #244a78;color:#7ea8d4;padding:8px 18px;border-radius:6px;cursor:pointer;letter-spacing:2px;font-size:12px;}
@@ -511,6 +521,7 @@
     .item .iconBox{width:48px;height:48px;}
     .item .iconBox canvas{width:46px !important;height:46px !important;}
     .item.skin canvas{width:80px !important;height:54px !important;}
+    .item.theme .bgPreview{width:80px;height:54px;}
     .item .actions{min-width:90px;}
     #hudBottom{display:none !important;}
     #saveBar{font-size:11px;padding:5px 9px;}
@@ -761,28 +772,85 @@
   .navBtn:hover .ring::after{ animation-duration:1.4s; opacity:1; }
   .navBtn:active .ring{transform:translateY(-2px) scale(.96); box-shadow:0 2px 0 #050a18, 0 3px 8px #00000099, inset 0 -10px 18px #00000077;}
   .navBtn .ring canvas{width:90% !important; height:90% !important; display:block; pointer-events:none; position:relative; z-index:1; filter:drop-shadow(0 2px 0 #050a18);}
-  /* Label — gradient + glow */
+
+  /* === Naked-icon override =================================================
+     Drops the entire circular ring chrome from the bottom-nav buttons so
+     the icons sit flat against the hub scene. Aura, orbit dashes, shine,
+     border, background, drop-shadows on the .ring itself — all gone. The
+     icon canvas grows to fill the slot and picks up a strong per-theme
+     drop-shadow so it still pops without a backdrop. Hover keeps the lift
+     + a brightness/saturation kick. */
+  .navBtn .ring{
+    background: none !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    animation: none !important;
+    overflow: visible !important;
+  }
+  .navBtn .ring::before,
+  .navBtn .ring::after,
+  .navBtn .ring > .shine{ display: none !important; }
+  .navBtn:hover .ring{
+    box-shadow: none !important;
+    filter: brightness(1.18) saturate(1.25) !important;
+  }
+  .navBtn:active .ring{ box-shadow: none !important; }
+  /* Bigger canvas + strong theme-coloured glow so the icon reads as the
+     button without any backdrop. Two stacked drop-shadows: a soft outer
+     halo and a tighter inner one, both in the button's --c1 colour. */
+  .navBtn .ring canvas{
+    width: 100% !important; height: 100% !important;
+    filter:
+      drop-shadow(0 3px 0 #050a18)
+      drop-shadow(0 0 14px var(--c1, #ffea00))
+      drop-shadow(0 0 5px var(--c1, #ffea00)) !important;
+  }
+  .navBtn:hover .ring canvas{
+    filter:
+      drop-shadow(0 4px 0 #050a18)
+      drop-shadow(0 0 22px var(--c1, #ffea00))
+      drop-shadow(0 0 7px #ffffff) !important;
+  }
+  /* The orbit-spark on the big PLAY button was anchored to the ring's
+     center — without the ring it floats awkwardly. Hide it. */
+  .navBtn.big::after{ display: none !important; }
+  /* Label — gradient + glow. Tinted per nav theme via the same --c1
+     custom property the ring uses, so SHOP labels read gold, BOSSES
+     pink, LEARN purple etc. Falls back to the white→gold→orange
+     gradient for buttons without a theme variable. */
   .navBtn .lbl{
     font-size:15px; letter-spacing:4px; font-weight:900;
-    background:linear-gradient(180deg,#ffffff 0%,#ffea00 60%,#ff8800 100%);
+    background:linear-gradient(180deg, #ffffff 0%, var(--c1, #ffea00) 60%, #050a18 100%);
     -webkit-background-clip:text;-webkit-text-fill-color:transparent;
-    filter:drop-shadow(0 2px 0 #050a18) drop-shadow(0 0 10px #ffea0066);
+    filter:drop-shadow(0 2px 0 #050a18) drop-shadow(0 0 10px var(--c1, #ffea00)66);
     text-transform:uppercase;
     transition:transform .2s, filter .2s;
   }
+  /* Each navBtn variant already sets --c1 on .ring; promote it to the
+     button itself so the .lbl child can read it. */
+  .navBtn.shipsClr { --c1:#aa66ff; }
+  .navBtn.bossClr  { --c1:#ff00aa; }
+  .navBtn.playClr  { --c1:#00d977; }
+  .navBtn.pvpClr   { --c1:#ff3366; }
+  .navBtn.shopClr  { --c1:#ffaa00; }
+  .navBtn.tutClr   { --c1:#aa66ff; }
   .navBtn:hover .lbl{
     transform:scale(1.08);
     filter:drop-shadow(0 2px 0 #050a18) drop-shadow(0 0 18px #ffffff);
   }
-  /* Ribbon */
+  /* Ribbon — sits flush at the top of the icon now that the circular
+     ring chrome is gone. Tightened position (top:-2px) + shorter
+     drop-shadow so it reads as a label ON the icon, not a separate
+     floating element with a trailing red shadow. */
   .navBtn .ribbon{
-    position:absolute; top:-14px; left:50%;
+    position:absolute; top:-2px; left:50%;
     transform:translateX(-50%) rotate(-6deg);
     background:linear-gradient(180deg,#ff3344,#aa1122);
-    color:#fff; font-size:11px; letter-spacing:2px; padding:4px 14px;
-    border-radius:6px; border:2px solid #050a18; font-weight:900;
+    color:#fff; font-size:10px; letter-spacing:2px; padding:3px 10px;
+    border-radius:4px; border:2px solid #050a18; font-weight:900;
     text-shadow:0 1px 0 #050a18;
-    box-shadow:0 3px 0 #050a18, 0 5px 14px #ff334466;
+    box-shadow:0 2px 0 #050a18;
     z-index:5;
     animation:ribbonWobble 1.6s ease-in-out infinite;
   }
@@ -1066,6 +1134,99 @@
      button needs a tighter offset for the phone HUD. — */
   body.is-phone .tBtn.pause{top:calc(env(safe-area-inset-top) + 4px);right:calc(env(safe-area-inset-right) + 4px);}
 
+  /* === PHONE DECLUTTER ===================================================
+     Trim ornamental UI on phone — the small viewport makes labels +
+     ribbons + the joke "+" button compete with gameplay. Functional
+     icons stay; decorative text/affordances go.                         */
+
+  /* Hide empty consumable slots entirely (count=0) — the JS sets
+     data-empty="1" on every count change. Replaces the desktop
+     grayscale-and-fade with a clean disappear so the left edge of
+     the screen isn't a column of three dim circles for new players. */
+  body.is-phone .tBtn.cons[data-empty="1"]{ display:none; }
+
+  /* Hide the per-nav-button ribbons (HARD / NEW / BETA). They're
+     marketing flair and add visual noise on the bottom-row icons. */
+  body.is-phone .navBtn .ribbon{ display:none; }
+
+  /* Drop the text labels under the round side buttons (SETTINGS /
+     AWARDS / DAILY / STATS / PRESTIGE). The icons + colour-coding
+     identify them; the labels just stretch the column vertically. */
+  body.is-phone .sideSlot .sideLbl{ display:none; }
+
+  /* Hide the shardBar's "+ buy more" button — it was a placeholder
+     that doesn't lead anywhere and adds a third element to the
+     top-right corner already containing the gem + count. */
+  body.is-phone .shardBar .plus{ display:none; }
+
+  /* Hide the title subtitle line "// INFINITE VOID //". The main
+     "HYPER SHARDS" title is enough branding on a 5-inch screen. */
+  body.is-phone .hubTitleSub{ display:none; }
+
+  /* === Phone CONSOLIDATED account + modes ============================
+     On phone the 5 side buttons (settings/awards/daily/stats/prestige)
+     and the top-right shardBar are all absorbed into a single tap
+     target: the pilot badge in the top-left. That same badge now also
+     shows the shard count inline (no separate floating count). The
+     bottom nav drops the per-mode buttons (BOSSES / VS AI / LEARN /
+     3D) in favour of a MODES button that opens a submenu picker, so
+     the bottom row is just PLAY + MODES + SHOP. */
+
+  /* Hide all five side buttons — their actions live in the ACCOUNT
+     modal opened by tapping the pilot badge. */
+  body.is-phone #hubSideL, body.is-phone #hubSideR{ display:none; }
+
+  /* Hide the top-right shardBar — shards now live inside the pilot
+     badge on the left. */
+  body.is-phone .shardBar{ display:none; }
+
+  /* Show the in-badge shards line + style it like the desktop shardBar
+     (gold gem + count). Hidden on tablet/desktop where the floating
+     shardBar still renders. */
+  .pilotBadge .phoneShards{ display:none; }
+  body.is-phone .pilotBadge .phoneShards{
+    display:flex; align-items:center; gap:4px;
+    color:#ffea00; font-size:11px; font-weight:900;
+    text-shadow:0 1px 0 #050a18;
+    margin-top:2px;
+  }
+  body.is-phone .pilotBadge .phoneShards .gem{
+    color:#ffea00; text-shadow:0 0 6px #ffea0088;
+  }
+
+  /* The pilot badge becomes the account button on phone. Cursor +
+     subtle tap feedback so it reads as interactive. */
+  body.is-phone .pilotBadge{ cursor:pointer; transition:transform .15s; }
+  body.is-phone .pilotBadge:active{ transform:scale(.96); }
+
+  /* Account "!" badge — flashes when there's something for the player
+     (unclaimed daily, prestige ready). Positioned above the badge so
+     it never overlaps the pilot name or shard line. Hidden by default,
+     toggled by updateHubInfo. */
+  .pilotBadge .acctBadge{
+    position:absolute; top:-8px; right:-6px;
+    background:linear-gradient(180deg,#ff3344,#aa1122);
+    color:#fff; font-weight:900; font-size:11px;
+    width:18px; height:18px; line-height:14px; text-align:center;
+    border:2px solid #050a18; border-radius:50%;
+    box-shadow:0 0 10px #ff3344;
+    display:none;
+    z-index:4;
+  }
+  body.is-phone .pilotBadge{ position:relative; padding-right:14px; }
+  body.is-phone .pilotBadge.has-alert .acctBadge{ display:block; }
+
+  /* Bottom nav — hide BOSSES, VS AI, LEARN, 3D; show MODES.
+     Result: PLAY (big centre) + MODES (left) + SHOP (right). */
+  body.is-phone .navBtn[data-nav="boss"],
+  body.is-phone .navBtn[data-nav="pvp"],
+  body.is-phone .navBtn[data-nav="tut"],
+  body.is-phone .navBtn[data-nav="3d"]{ display:none; }
+  body.is-phone .navBtn[data-nav="modes"]{ display:flex; }
+  /* On every non-phone form factor the MODES button is hidden — the
+     individual mode buttons cover its role. */
+  .navBtn[data-nav="modes"]{ display:none; }
+
   /* — Shop / modal sizing — */
   body.is-phone #menuShop{width:98vw;max-height:96vh;}
   body.is-phone #shopScroll{max-height:50vh;}
@@ -1075,6 +1236,7 @@
   body.is-phone .item .iconBox{width:40px;height:40px;}
   body.is-phone .item .iconBox canvas{width:38px !important;height:38px !important;}
   body.is-phone .item.skin canvas{width:70px !important;height:46px !important;}
+  body.is-phone .item.theme .bgPreview{width:70px;height:46px;}
   body.is-phone .item .actions{min-width:74px;}
   body.is-phone .item .actions .price{font-size:10px;}
   body.is-phone .tabs{gap:3px;flex-wrap:wrap;justify-content:center;}

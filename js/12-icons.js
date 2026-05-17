@@ -234,6 +234,235 @@ function drawSpecialIcon(g, id){
 }
 
 // ============================================================
+// REAL 3D PLANE MESH (vertex-projected on Canvas2D)
+// ============================================================
+// Low-poly fighter (~30 verts, ~22 faces). Each frame we rotate every
+// vertex, project to 2D via simple perspective, painter's-sort the
+// faces by depth and fill them. Per-face Lambert shading against a
+// fixed key light gives orientation cues; per-face vertical gradient
+// gives the BTD6 "claymation" panel look. Replaces the previous
+// cel-shaded fake-3D stack so the icon can actually rotate in space.
+//
+// Coordinate system: +X right, +Y down (canvas convention), +Z toward
+// the viewer. Model fits roughly inside a unit cube; draw scale ≈ 32
+// fills the 96-unit design space used by draw3DMenuIcon.
+const _P_V = [
+  /*  0 */ [ 0.00, -1.00,  0.00],   // nose tip
+  /*  1 */ [ 0.00, -0.55, -0.20],   // top spine (forward)
+  /*  2 */ [ 0.00,  0.00, -0.20],   // top spine (mid)
+  /*  3 */ [ 0.00,  0.60, -0.13],   // top spine (rear)
+  /*  4 */ [ 0.00,  0.95,  0.00],   // tail tip
+  /*  5 */ [ 0.20, -0.55,  0.00],   // right side (forward)
+  /*  6 */ [ 0.22,  0.00,  0.00],   // right side (mid)
+  /*  7 */ [ 0.17,  0.60,  0.05],   // right side (rear)
+  /*  8 */ [-0.20, -0.55,  0.00],   // left side (forward)
+  /*  9 */ [-0.22,  0.00,  0.00],   // left side (mid)
+  /* 10 */ [-0.17,  0.60,  0.05],   // left side (rear)
+  /* 11 */ [ 0.00, -0.55,  0.18],   // belly spine (forward)
+  /* 12 */ [ 0.00,  0.00,  0.18],   // belly spine (mid)
+  /* 13 */ [ 0.00,  0.60,  0.14],   // belly spine (rear)
+  /* 14 */ [-1.10,  0.45,  0.05],   // L wing tip (leading)
+  /* 15 */ [-0.90,  0.62,  0.05],   // L wing tip (trailing)
+  /* 16 */ [-0.22,  0.18,  0.05],   // L wing root (leading)
+  /* 17 */ [-0.20,  0.55,  0.05],   // L wing root (trailing)
+  /* 18 */ [ 1.10,  0.45,  0.05],   // R wing tip (leading)
+  /* 19 */ [ 0.90,  0.62,  0.05],   // R wing tip (trailing)
+  /* 20 */ [ 0.22,  0.18,  0.05],   // R wing root (leading)
+  /* 21 */ [ 0.20,  0.55,  0.05],   // R wing root (trailing)
+  /* 22 */ [ 0.00,  0.50, -0.20],   // tail fin base front
+  /* 23 */ [ 0.00,  0.30, -0.55],   // tail fin top front
+  /* 24 */ [ 0.00,  0.85, -0.50],   // tail fin top back
+  /* 25 */ [ 0.00,  0.93, -0.13],   // tail fin base back
+  /* 26 */ [ 0.00, -0.30, -0.32],   // canopy front
+  /* 27 */ [ 0.00,  0.10, -0.32],   // canopy back
+  /* 28 */ [-0.14, -0.10, -0.32],   // canopy left
+  /* 29 */ [ 0.14, -0.10, -0.32],   // canopy right
+];
+
+// Faces — m: material key (resolved to color per drawPlane call).
+const _P_F = [
+  // top body — fan from nose, wrap right + left, then mid + tail
+  { v:[0, 5, 1],     m:'body' },
+  { v:[0, 1, 8],     m:'body' },
+  { v:[1, 5, 6, 2],  m:'body' },
+  { v:[1, 2, 9, 8],  m:'body' },
+  { v:[2, 6, 7, 3],  m:'body' },
+  { v:[2, 3, 10, 9], m:'body' },
+  { v:[3, 7, 4],     m:'body' },
+  { v:[3, 4, 10],    m:'body' },
+  // belly — same shape underneath
+  { v:[0, 11, 5],    m:'belly' },
+  { v:[0, 8, 11],    m:'belly' },
+  { v:[5, 11, 12, 6],m:'belly' },
+  { v:[8, 9, 12, 11],m:'belly' },
+  { v:[6, 12, 13, 7],m:'belly' },
+  { v:[9, 10, 13, 12],m:'belly' },
+  { v:[7, 13, 4],    m:'belly' },
+  { v:[10, 4, 13],   m:'belly' },
+  // wings (flat quads) and tail fin (flat quad)
+  { v:[16, 14, 15, 17], m:'wing' },
+  { v:[20, 21, 19, 18], m:'wing' },
+  { v:[22, 23, 24, 25], m:'tail' },
+  // canopy top (flat quad)
+  { v:[26, 29, 27, 28], m:'canopy' },
+];
+
+// === Tiny 3D math helpers (no deps; inline matrices would just bloat) ===
+function _vrotXY(p, ax, ay){
+  const cx=Math.cos(ax), sx=Math.sin(ax);
+  const cy=Math.cos(ay), sy=Math.sin(ay);
+  // Pitch (X) then yaw (Y).
+  const y1 = p[1]*cx - p[2]*sx;
+  const z1 = p[1]*sx + p[2]*cx;
+  const x2 = p[0]*cy + z1*sy;
+  const z2 = -p[0]*sy + z1*cy;
+  return [x2, y1, z2];
+}
+function _vsub(a, b){ return [a[0]-b[0], a[1]-b[1], a[2]-b[2]]; }
+function _vcross(a, b){
+  return [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];
+}
+function _vlen(v){ return Math.sqrt(v[0]*v[0]+v[1]*v[1]+v[2]*v[2]); }
+function _vdot(a, b){ return a[0]*b[0]+a[1]*b[1]+a[2]*b[2]; }
+// Perspective project — camera is positioned at +DIST along Z (in our
+// convention +Z is toward viewer), so a vertex with Z near +1 is close
+// and Z near -1 is far. Returns [x, y].
+function _vproject(p, scale, dist){
+  const z = dist - p[2];
+  const k = scale * 4 / Math.max(z, 0.5);
+  return [p[0]*k, p[1]*k];
+}
+// Multiply a #rrggbb hex by a brightness factor (Lambert shading).
+function _shadeHex(hex, f){
+  const h = (hex||'#888888').replace('#','');
+  const r = Math.min(255, Math.max(0, parseInt(h.slice(0,2),16)*f|0));
+  const g = Math.min(255, Math.max(0, parseInt(h.slice(2,4),16)*f|0));
+  const b = Math.min(255, Math.max(0, parseInt(h.slice(4,6),16)*f|0));
+  return 'rgb('+r+','+g+','+b+')';
+}
+
+// === The render itself ===
+// `g` is a Canvas2D context already centered at (0,0). `opts` is the
+// same params object that the legacy drawPlane accepted; we only use
+// the colors. Caller is responsible for clearing the canvas.
+function drawPlane3D(g, opts){
+  opts = opts || {};
+  const tt = (typeof performance !== 'undefined' ? performance.now() : Date.now())/1000;
+  // Yaw OSCILLATION (not full spin) — rotates between roughly -35° and
+  // +35° so the wing tip never points straight at the camera (which
+  // would render as just a thin edge). Pitch stands the plane up so
+  // it reads as a 3/4 side view: π/2 of rotation gets us to a pure
+  // side profile (camera looking at the plane horizontally), and we
+  // back off by 15° (≈0.262 rad) so the top is just slightly visible.
+  const yaw   = Math.sin(tt * 0.6) * 0.62;
+  const pitch = -Math.PI/2 + 0.262;   // ≈ -1.309 rad → 15° tilt from side-on
+
+  const mat = {
+    body:   opts.body        || '#3aa0ff',
+    belly:  opts.bodyShadow  || '#1a5a99',
+    wing:   opts.wing        || '#6cc0ff',
+    tail:   opts.tail        || '#ff66cc',
+    canopy: opts.goggles     || '#88e8ff',
+  };
+  const accent = opts.accent || '#ffea00';
+
+  // Key light direction (from upper-left, into screen).
+  const lx=-0.4, ly=-0.9, lz=-0.5, lL=Math.sqrt(lx*lx+ly*ly+lz*lz);
+  const light = [lx/lL, ly/lL, lz/lL];
+
+  // Transform every vertex (rotate + project) once.
+  const SCALE = 30;
+  const DIST  = 3.5;
+  const v3 = _P_V.map(v => _vrotXY(v, pitch, yaw));
+  const v2 = v3.map(p => _vproject(p, SCALE, DIST));
+
+  // === Ground patch — warm cream ellipse below the plane (BTD6 style) ===
+  g.save();
+  const gp = g.createRadialGradient(2, 36, 6, 2, 36, 44);
+  gp.addColorStop(0,    '#f6e7c2');     // bright centre
+  gp.addColorStop(0.55, '#d9c69266');   // mid alpha
+  gp.addColorStop(1,    '#d9c69200');   // feathered edge
+  g.fillStyle = gp;
+  g.beginPath(); g.ellipse(2, 36, 44, 11, 0, 0, Math.PI*2); g.fill();
+  // Hard contact shadow on top of the patch
+  g.fillStyle = 'rgba(0,0,0,0.30)';
+  g.beginPath(); g.ellipse(3, 35, 26, 6, 0, 0, Math.PI*2); g.fill();
+  g.restore();
+
+  // === Build face render list (sort by depth, painter's algorithm) ===
+  const faces = [];
+  for(const f of _P_F){
+    const pts3 = f.v.map(i => v3[i]);
+    const pts2 = f.v.map(i => v2[i]);
+    // Face normal from first three vertices (assumes face is roughly
+    // planar — true for our quads, fine for tris).
+    const a = _vsub(pts3[1], pts3[0]);
+    const b = _vsub(pts3[2], pts3[0]);
+    const n = _vcross(a, b);
+    const nLen = _vlen(n) || 1;
+    // |dot| keeps shading winding-order-agnostic (saves debugging).
+    const lambert = Math.abs(_vdot(n, light)) / nLen;
+    const shade = 0.40 + 0.65 * lambert;     // ambient .40 + diffuse up to ~1.05
+    // Average Z for sort (smaller Z = farther in our convention → drawn first).
+    const avgZ = pts3.reduce((s, p) => s + p[2], 0) / pts3.length;
+    // Per-face vertical extent for the chunky top-light gradient.
+    let yMin=+Infinity, yMax=-Infinity;
+    for(const p of pts2){ if(p[1]<yMin) yMin=p[1]; if(p[1]>yMax) yMax=p[1]; }
+    faces.push({ pts2, mat:f.m, color: _shadeHex(mat[f.m], shade), avgZ, yMin, yMax });
+  }
+  faces.sort((a, b) => a.avgZ - b.avgZ);
+
+  // === Draw each face: filled with vertical gradient + thick outline ===
+  g.lineJoin = 'round';
+  g.lineCap = 'round';
+  for(const f of faces){
+    g.beginPath();
+    g.moveTo(f.pts2[0][0], f.pts2[0][1]);
+    for(let i=1;i<f.pts2.length;i++) g.lineTo(f.pts2[i][0], f.pts2[i][1]);
+    g.closePath();
+    // Vertical gradient: top vertex of face = brighter, bottom = darker.
+    // Approximates the rim-light look the BTD6 reference uses without
+    // needing per-vertex normals.
+    if(f.yMax - f.yMin > 1){
+      const gr = g.createLinearGradient(0, f.yMin, 0, f.yMax);
+      gr.addColorStop(0,   _shadeHex(f.color.replace('rgb(','#').replace(/[(),]/g,''), 1));
+      gr.addColorStop(0.0, '#ffffffaa');   // top rim light
+      gr.addColorStop(0.45, f.color);      // base color mid
+      gr.addColorStop(1,   '#0a0a1455');   // dark wash bottom
+      g.fillStyle = gr;
+    } else {
+      g.fillStyle = f.color;
+    }
+    g.fill();
+    g.strokeStyle = '#0a0a14'; g.lineWidth = 2.2;
+    g.stroke();
+  }
+
+  // === Gold racing trim along the body sides (visible only when those
+  // faces face the viewer enough) — drawn over the body as accent lines.
+  // Connects right-side mid vertices and left-side mid vertices.
+  g.strokeStyle = accent; g.lineWidth = 1.8; g.lineCap='round';
+  g.beginPath();
+  g.moveTo(v2[5][0], v2[5][1]); g.lineTo(v2[6][0], v2[6][1]); g.lineTo(v2[7][0], v2[7][1]);
+  g.stroke();
+  g.beginPath();
+  g.moveTo(v2[8][0], v2[8][1]); g.lineTo(v2[9][0], v2[9][1]); g.lineTo(v2[10][0], v2[10][1]);
+  g.stroke();
+
+  // === Wing-tip nav lights (port-red, starboard-green) ===
+  for(const [vIdx, col] of [[14, '#ff3344'], [18, '#00ffaa']]){
+    const p = v2[vIdx];
+    g.save();
+    g.fillStyle = col; g.shadowColor = col; g.shadowBlur = 9;
+    g.beginPath(); g.arc(p[0], p[1], 2.2, 0, Math.PI*2); g.fill();
+    g.shadowBlur = 0;
+    g.fillStyle = '#ffffff';
+    g.beginPath(); g.arc(p[0]-0.6, p[1]-0.5, 0.9, 0, Math.PI*2); g.fill();
+    g.restore();
+  }
+}
+
+// ============================================================
 // 3D MENU ICONS — chunky Bloons-style depth
 // ============================================================
 function draw3DMenuIcon(g, type){
@@ -310,33 +539,63 @@ function draw3DMenuIcon(g, type){
   // through the visor and a dangly cape) has been retired; this is
   // its replacement and uses the same parameter shape so the per-type
   // theme calls below don't have to change.
-  function drawPlane({ body='#3aa0ff', bodyShadow='#1a5a99', wing='#6cc0ff', tail='#ff66cc',
-                       prop='#ffea00', boost='#aacfff', boostShadow='#5588cc',
-                       hat='#dddddd', hatShadow='#888888',
-                       skin='#f0c089', skinShadow='#c98456',
-                       goggles='#00eaff', scarf='#ff3344', accent='#ffea00',
-                       expression='happy' } = {}){
-    // Idle bob — small vertical sway so the plane doesn't look static.
-    const bob = Math.sin(performance.now()/650) * 1.5;
+  function drawPlane(opts){
+    // Delegates to the real 3D engine (drawPlane3D, top of file). The
+    // ~270-line cel-shaded body that used to live here has been retired
+    // in favour of vertex projection — every frame the model is rotated
+    // and faces are sorted + filled with Lambert shading + per-face
+    // gradient. Same parameter shape kept for the per-type theme calls
+    // below.
+    drawPlane3D(g, opts || {});
+  }
+  // === DEAD CODE: legacy cel-shaded drawPlane body, scheduled for delete
+  //     once the 3D version is shipped to all icon sizes. Wrapped in an
+  //     `if(false)` so the parser keeps validating it but it never runs.
+  if(false){
+    const tt = performance.now();
+    const bob = Math.sin(tt/650) * 1.6;
+
+    // 1. Ground "footprint" — bigger neon halo + dual drop-shadow disc.
+    // Halo radius bumped from 38 → 48 and intensity raised so it reads
+    // clearly even at 50 px nav-button size. Two stacked dark discs (a
+    // soft outer + a harder inner) give the contact shadow a real
+    // falloff instead of a flat ellipse.
+    g.save();
+    const glowG = g.createRadialGradient(2, 32, 6, 2, 32, 48);
+    glowG.addColorStop(0,    body+'00');
+    glowG.addColorStop(0.30, body+'aa');
+    glowG.addColorStop(0.60, body+'66');
+    glowG.addColorStop(1,    body+'00');
+    g.fillStyle = glowG;
+    g.beginPath(); g.ellipse(2, 32, 48, 14, 0, 0, Math.PI*2); g.fill();
+    // Soft outer dark shadow
+    g.globalAlpha = 0.30;
+    g.fillStyle = '#000000';
+    g.beginPath(); g.ellipse(4, 32, 30, 8, 0, 0, Math.PI*2); g.fill();
+    // Hard inner contact shadow
+    g.globalAlpha = 0.60;
+    g.beginPath(); g.ellipse(4, 30, 22, 5, 0, 0, Math.PI*2); g.fill();
+    g.restore();
+
     g.save();
     g.translate(0, bob);
-
-    // 1. Drop-shadow disc on the "ground" — sells the 3D feel.
-    g.save();
-    g.globalAlpha = 0.55;
-    g.fillStyle = '#000000';
-    g.beginPath();
-    g.ellipse(2, 30 - bob, 28, 6, 0, 0, Math.PI*2);
-    g.fill();
-    g.restore();
+    // 2. Perspective transform — vertical squash + horizontal skew so
+    // the plane reads as a 3/4 isometric view (camera looking down at
+    // ~45°), not a flat top-down. This is the change that most clearly
+    // separates the new design from the old chibi-pilot mascot. The
+    // skew shifts the top of the silhouette right and the bottom left,
+    // producing the same parallax cue as a die-cast model on a shelf.
+    g.transform(1, 0, -0.12, 0.86, 0, 0);
 
     // Helper: stacked-layer extrude (BTD6 chunky depth). Draws `layers`
     // copies of the path offset down-left in pure black, then the
     // top-face fill, then a clipped highlight on the upper edge.
     function chunky3d(drawFn, baseCol, hiCol, depth=5, lightOff=-10, lightAmt=0.55){
-      // Depth slabs (back to front, darker to base color).
+      // Depth slabs (back to front, darker to base color). Bumped from
+      // 0.85 → 1.1 px-per-layer so the extruded depth reads clearly even
+      // at the 50 px phone-portrait nav-button size.
       for(let z=depth; z>0; z--){
-        g.save(); g.translate(0, z*0.85);
+        g.save(); g.translate(0, z*1.1);
         g.fillStyle = OUTLINE; drawFn(g);
         g.restore();
       }
@@ -384,14 +643,43 @@ function draw3DMenuIcon(g, type){
       g.closePath();
       stroke ? g.stroke() : g.fill();
     }, wing, '#ffffff', 4, -6, 0.45);
-    // Wing accent stripe along the leading edge for definition.
+    // Wing accent — bold chrome two-tone (thicker gold band + white
+    // racing-stripe shine). Drawn at full 3 px height instead of the
+    // previous hairline so the dripped look reads at icon scale.
     g.save();
     g.fillStyle = accent;
     g.beginPath();
-    g.moveTo(-22, 9); g.lineTo(-7, 1); g.lineTo(7, 1); g.lineTo(22, 9);
-    g.lineTo(20, 11); g.lineTo(7, 3); g.lineTo(-7, 3); g.lineTo(-20, 11);
+    g.moveTo(-22, 8.5); g.lineTo(-7, 0.5); g.lineTo(7, 0.5); g.lineTo(22, 8.5);
+    g.lineTo(20, 12);   g.lineTo(7, 4);    g.lineTo(-7, 4);  g.lineTo(-20, 12);
     g.closePath(); g.fill();
-    g.strokeStyle = OUTLINE; g.lineWidth = 1; g.stroke();
+    g.strokeStyle = OUTLINE; g.lineWidth = 1.5; g.stroke();
+    // White racing-stripe shine running along the top of the gold band
+    g.fillStyle = '#ffffff';
+    g.beginPath();
+    g.moveTo(-20, 9.2); g.lineTo(-7, 1.5); g.lineTo(7, 1.5); g.lineTo(20, 9.2);
+    g.lineTo(19, 10.4); g.lineTo(7, 2.7);  g.lineTo(-7, 2.7); g.lineTo(-19, 10.4);
+    g.closePath(); g.fill();
+    g.restore();
+    // Wingtip nav lights — bigger, brighter, with a hard outline so they
+    // pop even at 50 px button size. Port-red / starboard-green per real
+    // aircraft convention.
+    g.save();
+    g.shadowColor = '#ff3344'; g.shadowBlur = 12;
+    g.fillStyle = '#ff3344';
+    g.beginPath(); g.arc(-26, 9, 2.6, 0, Math.PI*2); g.fill();
+    g.fillStyle = '#ffffff'; g.globalAlpha = 0.85;
+    g.beginPath(); g.arc(-26.5, 8.5, 1, 0, Math.PI*2); g.fill();
+    g.globalAlpha = 1;
+    g.shadowColor = '#00ffaa';
+    g.fillStyle = '#00ffaa';
+    g.beginPath(); g.arc( 26, 9, 2.6, 0, Math.PI*2); g.fill();
+    g.fillStyle = '#ffffff'; g.globalAlpha = 0.85;
+    g.beginPath(); g.arc( 25.5, 8.5, 1, 0, Math.PI*2); g.fill();
+    g.globalAlpha = 1;
+    g.shadowBlur = 0;
+    g.strokeStyle = OUTLINE; g.lineWidth = 1.4;
+    g.beginPath(); g.arc(-26, 9, 2.6, 0, Math.PI*2); g.stroke();
+    g.beginPath(); g.arc( 26, 9, 2.6, 0, Math.PI*2); g.stroke();
     g.restore();
 
     // 4. Fuselage — chunky teardrop pointed up, viewer sees top + a
@@ -407,32 +695,66 @@ function draw3DMenuIcon(g, type){
       stroke ? g.stroke() : g.fill();
     }, body, '#ffffff', 6, -16, 0.6);
 
-    // Belly stripe (accent line down the centre of the fuselage).
+    // Side-fuselage shadow band — clipped dark gradient on the right side
+    // so the body reads as a curved 3D form, not a flat top-down silhouette.
     g.save();
-    g.strokeStyle = accent; g.lineWidth = 1.5;
-    g.beginPath(); g.moveTo(0, -18); g.lineTo(0, 16); g.stroke();
+    g.beginPath();
+    g.moveTo( 0, -22);
+    g.quadraticCurveTo( 9, -14,  10,  4);
+    g.quadraticCurveTo( 9,  18,  0,  20);
+    g.quadraticCurveTo(-9,  18, -10,  4);
+    g.quadraticCurveTo(-9, -14,  0, -22);
+    g.closePath(); g.clip();
+    const sf = g.createLinearGradient(2, 0, 11, 0);
+    sf.addColorStop(0, '#00000000');
+    sf.addColorStop(1, '#00000055');
+    g.fillStyle = sf; g.fillRect(0, -22, 12, 44);
     g.restore();
+    // Chrome belly stripe — thicker (3.5 px gold + 1.2 px white shine)
+    // so it reads as a proper racing decal rather than a hairline.
+    g.save();
+    g.strokeStyle = accent; g.lineWidth = 3.5; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(0, -19); g.lineTo(0, 17); g.stroke();
+    g.strokeStyle = '#ffffff'; g.lineWidth = 1.2;
+    g.beginPath(); g.moveTo(0, -19); g.lineTo(0, 17); g.stroke();
+    g.restore();
+    // Panel rivets along the stripe — bigger so they're visible at icon scale.
+    g.fillStyle = OUTLINE;
+    for(const ry of [-13, -5, 3, 11]){
+      g.beginPath(); g.arc(-4, ry, 1.0, 0, Math.PI*2); g.fill();
+      g.beginPath(); g.arc( 4, ry, 1.0, 0, Math.PI*2); g.fill();
+    }
 
-    // 5. Cockpit canopy — clear bubble near the front of the fuselage.
-    chunky3d((g, stroke)=>{
+    // 5. Cockpit canopy — bigger bubble with a thick black frame so it
+    // reads as a proper fighter-jet windshield, not a tinted blob.
+    function canopyPath(g){
       g.beginPath();
-      g.moveTo(-5, -10);
-      g.quadraticCurveTo(-5, -16, 0, -16);
-      g.quadraticCurveTo( 5, -16, 5, -10);
-      g.lineTo( 4, -2);
-      g.lineTo(-4, -2);
+      g.moveTo(-6, -10);
+      g.quadraticCurveTo(-6, -17, 0, -17);
+      g.quadraticCurveTo( 6, -17, 6, -10);
+      g.lineTo( 5, -1);
+      g.lineTo(-5, -1);
       g.closePath();
-      stroke ? g.stroke() : g.fill();
-    }, goggles, '#ffffff', 2, -16, 0.7);
-    // Bright sheen highlight on the canopy (sells the glass).
+    }
+    chunky3d(canopyPath, goggles, '#ffffff', 2, -17, 0.78);
+    // Frame outline (thick black border around the windshield)
+    g.strokeStyle = OUTLINE; g.lineWidth = 2.2; canopyPath(g); g.stroke();
+    // Twin sheen highlights — bigger, brighter so the glass reads.
     g.save();
     g.fillStyle = '#ffffff';
-    g.globalAlpha = 0.75;
+    g.globalAlpha = 0.92;
     g.beginPath();
-    g.ellipse(-2, -12, 1.5, 3.2, -0.3, 0, Math.PI*2);
+    g.ellipse(-2.5, -12, 2, 4, -0.3, 0, Math.PI*2);
+    g.fill();
+    g.globalAlpha = 0.55;
+    g.beginPath();
+    g.ellipse(3, -5, 1, 1.8, 0.2, 0, Math.PI*2);
     g.fill();
     g.globalAlpha = 1;
     g.restore();
+    // Center frame strip down the canopy (the real-world window divider).
+    g.strokeStyle = OUTLINE; g.lineWidth = 1.2;
+    g.beginPath(); g.moveTo(0, -16); g.lineTo(0, -2); g.stroke();
 
     // 6. Twin engine nozzles + flames — two short cylinders at the rear,
     // each with a cel-shaded flame trailing down.
@@ -447,7 +769,7 @@ function draw3DMenuIcon(g, type){
       g.restore();
 
       // Flame — outer (boost color), inner white core. Wobbles slightly.
-      const wob = Math.sin(performance.now()/90 + xOff)*1.2;
+      const wob = Math.sin(tt/90 + xOff)*1.2;
       g.save(); g.translate(xOff, nozzleY + 1);
       celShape((g, stroke)=>{
         g.beginPath();
@@ -465,8 +787,24 @@ function draw3DMenuIcon(g, type){
       g.restore();
     }
 
-    // 7. Tiny twinkling stars around the plane for theme flavour.
-    const tt = performance.now();
+    // 7. Vapor contrails behind the wing tips — soft white tapers fading
+    // into the shadow zone. Adds motion + fills the negative space below.
+    g.save();
+    for(const wx of [-25, 25]){
+      const trailG = g.createLinearGradient(wx, 14, wx, 30);
+      trailG.addColorStop(0, '#ffffff66');
+      trailG.addColorStop(1, '#ffffff00');
+      g.fillStyle = trailG;
+      g.beginPath();
+      g.moveTo(wx-1.4, 14);
+      g.lineTo(wx+1.4, 14);
+      g.lineTo(wx+0.5, 30);
+      g.lineTo(wx-0.5, 30);
+      g.closePath(); g.fill();
+    }
+    g.restore();
+
+    // 8. Tiny twinkling stars around the plane for theme flavour.
     g.fillStyle='#ffffff';
     for(const [sx,sy,sr] of [[-32,-18,1],[30,-14,1.2],[-26,22,0.8],[28,20,0.9]]){
       const tw = 0.35 + 0.65*Math.abs(Math.sin(tt/300 + sx));
@@ -788,61 +1126,227 @@ function draw3DMenuIcon(g, type){
     g.shadowBlur=0;
   }
 
-  // ===== Per-button mascots =====
+  // ===== Per-button icons =====
+  // PLAY / SHOP / LEARN / VS AI no longer use the plane mascot —
+  // each gets its own purpose-built icon so the bottom nav reads
+  // like a familiar app shelf. The plane mascot still lives under
+  // "ships" (the 3D button) and "ship" (hub hero) types.
+
+  // ---- PLAY: chunky green play triangle ▶ with BTD6-style depth ----
   if(type==='play'){
-    drawPlane({ body:'#3aa0ff', bodyShadow:'#1a4477', wing:'#66c8ff', tail:'#00ffaa',
-                boost:'#aacfff', boostShadow:'#3377cc', goggles:'#00eaff', accent:'#ffea00',
-                scarf:'#ff3344', expression:'happy' });
-  }
-  else if(type==='shop'){
-    drawPlane({ body:'#ffc244', bodyShadow:'#aa6b00', wing:'#ffd966', tail:'#ff8800',
-                boost:'#ffea00', boostShadow:'#cc7700', goggles:'#ff8800', accent:'#552200',
-                scarf:'#ff5500', expression:'wink' });
-    // Floating gold shard above
-    g.save(); g.translate(8, -34);
-    g.fillStyle='#ffea00'; g.strokeStyle=OUTLINE; g.lineWidth=2;
-    g.beginPath(); g.moveTo(0,-9); g.lineTo(6,0); g.lineTo(0,9); g.lineTo(-6,0); g.closePath();
-    g.fill(); g.stroke();
-    g.fillStyle='#ffffff'; g.beginPath(); g.arc(-2,-3,1.5,0,Math.PI*2); g.fill();
-    g.restore();
-  }
-  else if(type==='tut'){
-    drawPlane({ body:'#a08aff', bodyShadow:'#5a3aaa', wing:'#c7b3ff', tail:'#ff66cc',
-                boost:'#e0c8ff', boostShadow:'#7755cc', goggles:'#ff66cc', accent:'#ffea00',
-                scarf:'#ffea00', expression:'happy' });
-    // Star above
-    g.save(); g.translate(18, -34);
-    g.fillStyle='#ffea00'; g.strokeStyle=OUTLINE; g.lineWidth=2;
-    g.beginPath();
-    for(let i=0;i<10;i++){ const a=-Math.PI/2 + i/10*Math.PI*2; const r = i%2===0?7:3;
-      const x=Math.cos(a)*r, y=Math.sin(a)*r;
-      if(i===0) g.moveTo(x,y); else g.lineTo(x,y);
+    function triPath(g){
+      g.beginPath();
+      g.moveTo(-16, -22);
+      g.lineTo( 24,   0);
+      g.lineTo(-16,  22);
+      g.closePath();
     }
-    g.closePath(); g.fill(); g.stroke();
+    // Stacked-depth slabs offset down-right
+    for(let z = 6; z > 0; z--){
+      g.save(); g.translate(z*0.4, z*0.9);
+      g.fillStyle = OUTLINE; triPath(g); g.fill();
+      g.restore();
+    }
+    // Top face — green gradient (matches the playClr ring outside)
+    const grd = g.createLinearGradient(0, -22, 0, 22);
+    grd.addColorStop(0,    '#aaffd4');
+    grd.addColorStop(0.55, '#00d977');
+    grd.addColorStop(1,    '#005a30');
+    g.fillStyle = grd; triPath(g); g.fill();
+    g.strokeStyle = OUTLINE; g.lineWidth = 3; g.lineJoin = 'round';
+    triPath(g); g.stroke();
+    // Top sheen — clipped soft white wash on the upper half
+    g.save(); triPath(g); g.clip();
+    const sh = g.createLinearGradient(0, -22, 0, 0);
+    sh.addColorStop(0, '#ffffffcc'); sh.addColorStop(1, '#ffffff00');
+    g.fillStyle = sh; g.fillRect(-30, -30, 60, 60);
     g.restore();
   }
+
+  // ---- SHOP: shopping bag with rope handles + gold trim + ◈ logo ----
+  else if(type==='shop'){
+    function bagPath(g){
+      g.beginPath();
+      g.moveTo(-18, -6);
+      g.lineTo( 18, -6);
+      g.quadraticCurveTo( 22, -6,  22, -2);
+      g.lineTo( 22,  20);
+      g.quadraticCurveTo( 22,  24,  18,  24);
+      g.lineTo(-18,  24);
+      g.quadraticCurveTo(-22,  24, -22,  20);
+      g.lineTo(-22, -2);
+      g.quadraticCurveTo(-22, -6, -18, -6);
+      g.closePath();
+    }
+    // Depth slabs
+    for(let z = 5; z > 0; z--){
+      g.save(); g.translate(z*0.4, z*0.9);
+      g.fillStyle = OUTLINE; bagPath(g); g.fill();
+      g.restore();
+    }
+    // Bag face — warm gold gradient
+    const grd = g.createLinearGradient(0, -6, 0, 24);
+    grd.addColorStop(0,    '#ffea66');
+    grd.addColorStop(0.5,  '#ffc244');
+    grd.addColorStop(1,    '#aa6b00');
+    g.fillStyle = grd; bagPath(g); g.fill();
+    g.strokeStyle = OUTLINE; g.lineWidth = 3; g.lineJoin = 'round';
+    bagPath(g); g.stroke();
+    // Gold trim band along the bag's top edge
+    g.fillStyle = '#ffea00';
+    g.fillRect(-18, -4, 36, 3);
+    g.fillStyle = '#aa7700';
+    g.fillRect(-18, -1, 36, 1);
+    // Rope handles — two arches above the bag
+    g.strokeStyle = OUTLINE; g.lineWidth = 5; g.lineCap = 'round';
+    g.beginPath();
+    g.moveTo(-12, -6); g.bezierCurveTo(-12, -22, -2, -22, -2, -6);
+    g.moveTo( 12, -6); g.bezierCurveTo( 12, -22,  2, -22,  2, -6);
+    g.stroke();
+    g.strokeStyle = '#c9a050'; g.lineWidth = 2.5;
+    g.beginPath();
+    g.moveTo(-12, -6); g.bezierCurveTo(-12, -22, -2, -22, -2, -6);
+    g.moveTo( 12, -6); g.bezierCurveTo( 12, -22,  2, -22,  2, -6);
+    g.stroke();
+    // ◈ shard logo centered on the bag face
+    g.save();
+    g.fillStyle = '#ffea00'; g.strokeStyle = OUTLINE; g.lineWidth = 2;
+    g.beginPath();
+    g.moveTo(0, 4); g.lineTo(7, 12); g.lineTo(0, 20); g.lineTo(-7, 12);
+    g.closePath();
+    g.fill(); g.stroke();
+    g.fillStyle = '#ffffff';
+    g.beginPath(); g.arc(-2, 9, 1.5, 0, Math.PI*2); g.fill();
+    g.restore();
+  }
+
+  // ---- LEARN: open book with center spine + bookmark + page lines ----
+  else if(type==='tut'){
+    // Each page is a tilted quad. Draw left and right pages, with the
+    // center "spine" line between them. Bookmark hangs off the right page.
+    function leftPagePath(g){
+      g.beginPath();
+      g.moveTo(-22, -16);
+      g.lineTo(  0, -12);
+      g.lineTo(  0,  20);
+      g.lineTo(-22,  16);
+      g.closePath();
+    }
+    function rightPagePath(g){
+      g.beginPath();
+      g.moveTo(  0, -12);
+      g.lineTo( 22, -16);
+      g.lineTo( 22,  16);
+      g.lineTo(  0,  20);
+      g.closePath();
+    }
+    // Depth slabs for the whole book silhouette
+    for(let z = 5; z > 0; z--){
+      g.save(); g.translate(z*0.4, z*0.9);
+      g.fillStyle = OUTLINE;
+      leftPagePath(g); g.fill();
+      rightPagePath(g); g.fill();
+      g.restore();
+    }
+    // Left page — cream gradient
+    const lp = g.createLinearGradient(-22, 0, -4, 0);
+    lp.addColorStop(0, '#fffaee'); lp.addColorStop(1, '#d8c89a');
+    g.fillStyle = lp; leftPagePath(g); g.fill();
+    g.strokeStyle = OUTLINE; g.lineWidth = 2.5; g.lineJoin = 'round';
+    leftPagePath(g); g.stroke();
+    // Right page — same cream
+    const rp = g.createLinearGradient(4, 0, 22, 0);
+    rp.addColorStop(0, '#d8c89a'); rp.addColorStop(1, '#fffaee');
+    g.fillStyle = rp; rightPagePath(g); g.fill();
+    rightPagePath(g); g.stroke();
+    // Page text lines (six short strokes per page, sized to the tilt)
+    g.strokeStyle = '#8a7a4a'; g.lineWidth = 1;
+    for(let i = -6; i < 14; i += 3.5){
+      g.beginPath(); g.moveTo(-18, i); g.lineTo(-5, i + 0.6); g.stroke();
+      g.beginPath(); g.moveTo(  5, i + 0.6); g.lineTo(18, i); g.stroke();
+    }
+    // Center spine line (re-drawn over the join)
+    g.strokeStyle = OUTLINE; g.lineWidth = 2.5;
+    g.beginPath(); g.moveTo(0, -12); g.lineTo(0, 20); g.stroke();
+    // Red bookmark ribbon hanging from the top-right
+    g.fillStyle = '#ff3344';
+    g.beginPath();
+    g.moveTo( 8, -16); g.lineTo(15, -16);
+    g.lineTo(15,  10); g.lineTo(11.5,  6); g.lineTo( 8, 10);
+    g.closePath();
+    g.fill();
+    g.strokeStyle = OUTLINE; g.lineWidth = 1.5; g.stroke();
+  }
+
+  // ---- 3D mode + hub hero: use the plane mascot ----
   else if(type==='ship'){
     drawPlane({ body:'#00d977', bodyShadow:'#005a30', wing:'#66ffaa', tail:'#ffea00',
                 boost:'#a8ffe0', boostShadow:'#00aa66', goggles:'#00eaff', accent:'#ff3344',
                 scarf:'#ff3344', expression:'happy' });
   }
+
+  // ---- VS AI: two 2D top-down planes firing at each other ----
+  // Flat side-view planes (not the 3D mascot) — reads as "two aircraft
+  // dogfighting" at a glance. Bullets traverse the centre toward each
+  // ship; "VS" floats above.
   else if(type==='pvp'){
-    // Two pilots facing each other
-    g.save(); g.translate(-18, 4); g.scale(0.7,0.7);
-    drawPlane({ body:'#3aa0ff', bodyShadow:'#1a4477', wing:'#66c8ff', tail:'#00ffaa',
-                goggles:'#00eaff', scarf:'#ffea00', expression:'angry' });
-    g.restore();
-    g.save(); g.translate(18, 4); g.scale(-0.7, 0.7);
-    drawPlane({ body:'#ff3366', bodyShadow:'#992244', wing:'#ff88aa', tail:'#ffea00',
-                goggles:'#ff66aa', scarf:'#ffea00', expression:'angry' });
-    g.restore();
-    // VS spark
-    g.fillStyle='#ffea00'; g.shadowColor='#ffea00'; g.shadowBlur=12;
-    g.font = 'bold 18px sans-serif'; g.textAlign='center'; g.textBaseline='middle';
-    g.fillText('VS', 0, -22);
-    g.shadowBlur=0;
-    g.strokeStyle = OUTLINE; g.lineWidth = 3;
-    g.strokeText('VS', 0, -22);
+    function plane2D(cx, cy, body, accent, flip){
+      g.save();
+      g.translate(cx, cy);
+      if(flip) g.scale(-1, 1);
+      // shadow under plane
+      g.fillStyle = 'rgba(0,0,0,0.35)';
+      g.beginPath(); g.ellipse(2, 12, 14, 3, 0, 0, Math.PI*2); g.fill();
+      // wings (drawn first so fuselage covers root)
+      g.fillStyle = accent;
+      g.strokeStyle = OUTLINE; g.lineWidth = 1.5; g.lineJoin = 'round';
+      g.beginPath();
+      g.moveTo(-14, 2); g.lineTo(6, 0); g.lineTo(4, 5); g.lineTo(-12, 7);
+      g.closePath();
+      g.fill(); g.stroke();
+      // tail fin
+      g.beginPath();
+      g.moveTo(-12, -2); g.lineTo(-4, -2); g.lineTo(-4, -8); g.closePath();
+      g.fill(); g.stroke();
+      // fuselage
+      g.fillStyle = body;
+      g.beginPath();
+      g.moveTo(14, 0);
+      g.lineTo(2, -5); g.lineTo(-12, -3); g.lineTo(-12, 3); g.lineTo(2, 5);
+      g.closePath();
+      g.fill(); g.stroke();
+      // cockpit
+      g.fillStyle = '#88e8ff';
+      g.beginPath(); g.ellipse(2, 0, 4, 2.5, 0, 0, Math.PI*2); g.fill();
+      g.strokeStyle = OUTLINE; g.lineWidth = 1; g.stroke();
+      // nose tip glow
+      g.fillStyle = '#ffffff';
+      g.beginPath(); g.arc(14, 0, 1.4, 0, Math.PI*2); g.fill();
+      g.restore();
+    }
+    // Left plane — blue, points RIGHT (nose toward right-hand enemy)
+    plane2D(-22, -6, '#3aa0ff', '#1a4477', false);
+    // Right plane — red, points LEFT (mirrored so its nose faces left)
+    plane2D( 22,  6, '#ff3366', '#992244', true);
+    // Tracer bullets crossing the middle. Yellow toward right, cyan
+    // toward left — same convention as the 3D mode's wing-tip lights.
+    g.shadowBlur = 8;
+    g.fillStyle = '#ffea00'; g.shadowColor = '#ffea00';
+    for(const [x, y] of [[-6, -4], [4, -2], [14, 0]]){
+      g.beginPath(); g.arc(x, y, 1.8, 0, Math.PI*2); g.fill();
+    }
+    g.fillStyle = '#00eaff'; g.shadowColor = '#00eaff';
+    for(const [x, y] of [[6, 4], [-4, 2], [-14, 0]]){
+      g.beginPath(); g.arc(x, y, 1.8, 0, Math.PI*2); g.fill();
+    }
+    g.shadowBlur = 0;
+    // "VS" floating above
+    g.fillStyle = '#ffffff'; g.shadowColor = '#ff0066'; g.shadowBlur = 14;
+    g.font = 'bold 16px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText('VS', 0, -28);
+    g.shadowBlur = 0;
+    g.strokeStyle = OUTLINE; g.lineWidth = 2.5;
+    g.strokeText('VS', 0, -28);
   }
   else if(type==='boss'){
     // Boss head with horns and glowing red eye

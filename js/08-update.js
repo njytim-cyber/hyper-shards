@@ -4,8 +4,12 @@
 // CORE UPDATE (shared between survival + tutorial)
 // ============================================================
 function update(dt){
-  // Player movement
-  const sp = 0.55*player.speedMul;
+  // Player movement (free 8-directional strafe — the rail-shooter
+  // tunnel experiment was rolled back at the user's request).
+  // Super-ability buff (key 9): 15s of 1.4× movement speed on top of
+  // upgrades. Damage + fire-rate sides of the buff are applied in fire().
+  const superMul = state.fx.super > 0 ? 1.4 : 1;
+  const sp = 0.55*player.speedMul*superMul;
   let ax = 0, ay = 0;
   if(keys['a']||keys['arrowleft']) ax -= sp;
   if(keys['d']||keys['arrowright']) ax += sp;
@@ -201,9 +205,23 @@ function update(dt){
         for(let i=0;i<40;i++){
           state.shards.push({x:b.x+rand(-40,40),y:b.y+rand(-40,40),vx:rand(-2,2),vy:rand(-3,1),val:5,life:600});
         }
-        save.credits += 80 + b.tier*40;
-        state.earnedThisRun += 80 + b.tier*40;
+        const _bossReward = Math.round((80 + b.tier*40) * ((typeof PRESTIGE_PERKS !== 'undefined') ? PRESTIGE_PERKS.shardMul(save.prestige) : 1));
+        save.credits += _bossReward;
+        state.earnedThisRun += _bossReward;
         state.score += 500 + b.tier*200;
+        // === Award SKIN MASTERY XP for the boss tier. The XP table is
+        // defined in 01-core.js (BOSS_XP_BY_TIER) — same values as 3D
+        // mode. Tier 1 = 100, tier 2 = 300, ..., tier 5 = 1600.
+        // This was the missing link that made the user think bosses
+        // weren't awarding XP: the system existed in 3D mode but the
+        // 2D survival mode never called addSkinXp.
+        if(typeof addSkinXp === 'function' && typeof BOSS_XP_BY_TIER !== 'undefined'){
+          const _bossXp = BOSS_XP_BY_TIER[b.tier] || BOSS_XP_BY_TIER[1];
+          addSkinXp(save.skin || 'default', _bossXp);
+          if(typeof toast === 'function'){
+            toast('★ TIER ' + b.tier + ' DOWN  ·  +' + _bossReward + ' ◈  ·  +' + _bossXp + ' XP');
+          }
+        }
         state.boss = null;
         document.getElementById('bossBar').style.display='none';
         if(typeof playMusicSting==='function') playMusicSting('victory');
@@ -364,6 +382,16 @@ function update(dt){
       if(state.stats) state.stats.kills++;
       save.totalKills = (save.totalKills||0) + 1;
       comboKill(baseScore);
+      // Skin-mastery XP for regular kills: 4 per asteroid, 8 per UFO,
+      // plus a small combo bonus so streaks reward mastery progress
+      // (mirrors the 3D mode's 10 + min(20, combo) but scaled down a
+      // bit since 2D kills come faster). state.combo is an OBJECT
+      // ({count, timer, mult, killTime}) — must read .count.
+      if(typeof addSkinXp === 'function'){
+        const _xpBase  = e.type === 'ufo' ? 8 : 4;
+        const _xpCombo = Math.min(10, ((state.combo && state.combo.count) || 0) >> 1);
+        addSkinXp(save.skin || 'default', _xpBase + _xpCombo);
+      }
       sfx(e.r>40?'boom':'kill');
       if(e.r>40) state.hitStop = 30;
       // splitter asteroid: spawns smaller chunks
@@ -411,7 +439,8 @@ function update(dt){
     s.x += s.vx; s.y += s.vy;
     if(d < 22){
       const xpMul = save.specials.doubleXP ? 1.5 : 1;
-      const v = Math.round(s.val*xpMul);
+      const prestigeMul = (typeof PRESTIGE_PERKS !== 'undefined') ? PRESTIGE_PERKS.shardMul(save.prestige) : 1;
+      const v = Math.round(s.val * xpMul * prestigeMul);
       save.credits += v;
       state.earnedThisRun += v;
       state.score += v*5;
@@ -479,7 +508,7 @@ function update(dt){
   updateHud();
 }
 
-let _hudCache = { hp:-1, maxHp:-1, score:-1, credits:-1, ammo:'', round:'', skinId:'', abilityName:'', abilityPct:-1, fxKey:'', fxBarHTML:'',
+let _hudCache = { hp:-1, maxHp:-1, score:-1, credits:-1, ammo:'', round:'', skinId:'', abilityName:'', abilityPct:-1, abilityReadyBg:-1, fxKey:'', fxBarHTML:'',
   cdAbility:-1, fuelBoost:-1, abReady:-1,
   consHeal:-1, consShield:-1, consBomb:-1 };
 let _hudThrottle = 0;
@@ -577,8 +606,19 @@ function updateHud(){
     if(_hudCache.abilityPct !== pctBucket){
       _hudCache.abilityPct = pctBucket;
       $.abBar.style.width = pctBucket + '%';
+    }
+    // Background tracked SEPARATELY from the width bucket. The previous
+    // code only re-set the gradient when the % bucket changed — so if
+    // the bar reached pct=100 one frame *before* abilityCd actually hit
+    // 0 (rounding edge), the "ready" gradient never got applied on
+    // subsequent recharges. This split makes the ready→cooldown→ready
+    // transitions paint reliably.
+    const readyKey = ready ? 1 : 0;
+    if(_hudCache.abilityReadyBg !== readyKey){
+      _hudCache.abilityReadyBg = readyKey;
       $.abBar.style.background = ready
-        ? 'linear-gradient(90deg,#ffea00,#00ffaa)'
+        // Full rainbow when fully charged — sells the "ready to fire" state.
+        ? 'linear-gradient(90deg,#ff3344,#ffaa00,#ffea00,#00ff88,#00eaff,#aa66ff,#ff66cc)'
         : 'linear-gradient(90deg,#3a8acc,#1a4a7a)';
     }
     // Mirror to the touch ability button: --cd drives the conic-gradient

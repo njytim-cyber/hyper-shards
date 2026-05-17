@@ -650,8 +650,45 @@ function drawShip(g, p, now){
 
   let baseColor = skin.color;
   if(skin.rainbow) baseColor = `hsl(${(now/8)%360},90%,60%)`;
-  const accent = skin.accent;
-  g.shadowColor = skin.glow; g.shadowBlur = 14;
+  let accent = skin.accent;
+  // === MASTERY GOLD: when the equipped skin has been mastered, the
+  // whole 2D ship turns glittery gold — base + accent + glow all
+  // overridden, and a small sparkle particle is emitted each frame
+  // around the ship for the "glitter" feel. Mirrors the 3D mode's
+  // glittery-gold mastered ship treatment.
+  const masteredHere = (typeof isSkinMastered === 'function') && isSkinMastered(skin.id);
+  if(masteredHere){
+    baseColor = '#ffd700';                 // pure gold body
+    accent    = '#ffea00';                 // brighter gold accent
+    g.shadowColor = '#ffea00'; g.shadowBlur = 22;
+    // Glitter — 6 sparkles at fixed angles around the ship, each
+    // twinkling at its own sin-phase. Reads as a halo of stars, not
+    // a single dot teleporting (which playtesters called out as
+    // looking like a graphics glitch). Cheap: 6 small plus-shapes,
+    // skipped entirely when their twinkle value drops below 0.15.
+    g.save();
+    g.shadowBlur = 0;  // sparkles don't need the hull's gold blur
+    for(let i = 0; i < 6; i++){
+      const ang = (i / 6) * Math.PI * 2 + 0.3;     // fixed positions
+      const r   = 30;                               // orbit radius
+      const sx  = Math.cos(ang) * r;
+      const sy  = Math.sin(ang) * r;
+      // Each sparkle has its own phase so they don't all blink in sync.
+      // 0.78 phase offset = ~45° around the circle in twinkle-time.
+      const tw  = (Math.sin(now / 320 + i * 0.78) + 1) / 2;   // 0..1
+      if(tw < 0.15) continue;
+      const size = 1 + tw * 2.5;
+      g.globalAlpha = tw;
+      g.fillStyle = '#ffffff';
+      g.fillRect(sx - size/2, sy - 0.5, size, 1);
+      g.fillRect(sx - 0.5, sy - size/2, 1, size);
+    }
+    g.globalAlpha = 1;
+    g.restore();
+    g.shadowColor = '#ffea00'; g.shadowBlur = 22;   // restore for hull
+  } else {
+    g.shadowColor = skin.glow; g.shadowBlur = 14;
+  }
 
   // Wing back-glow
   g.fillStyle = baseColor;

@@ -11,6 +11,11 @@ const REQUIRED_TOP_LEVEL = [
   'credits', 'best', 'skin', 'username', 'music',
   'upgrades', 'weapons', 'consumables', 'specials',
   'bossWins',
+  // New fields added since the original schema test was written:
+  'hubBg', 'hubBgs',          // shop THEMES tab + ownership
+  'prestige',                  // PRESTIGE-or-RESET system
+  'foundSecrets',              // settings-modal secret pixel + future easter eggs
+  'skinXp',                    // per-skin mastery XP → unlocks ULTIMATES
 ];
 
 const REQUIRED_UPGRADES = [
@@ -96,4 +101,65 @@ test('save schema: corrupt JSON in localStorage falls back to defaultSave', () =
   assert.doesNotThrow(() => { ctx = loadAllAsBrowser(sandbox); });
   const credits = vm_eval(ctx, 'save.credits');
   assert.strictEqual(credits, 0, 'corrupt save should reset to defaults, not crash');
+});
+
+test('save schema: loadSave merges newly-added object fields onto old saves', () => {
+  // Player upgrades the game; their existing save predates hubBgs/skinXp/foundSecrets.
+  // The loadSave merge must backfill those maps so the new code paths don't
+  // crash on undefined.
+  const { sandbox } = buildSandbox();
+  sandbox.localStorage._store['hypershards_save_v3'] = JSON.stringify({
+    credits: 500, best: 100, skin: 'default',
+    upgrades: { hp: 2 },
+    weapons: { single: true },
+    skins:   { default: true },
+    // hubBgs, foundSecrets, skinXp deliberately ABSENT (old save shape)
+  });
+  const ctx = loadAllAsBrowser(sandbox);
+  const s = vm_eval(ctx, 'save');
+  assert.ok(s.hubBgs && typeof s.hubBgs === 'object',
+    'loadSave must backfill hubBgs onto old saves');
+  assert.strictEqual(s.hubBgs.nebula, true,
+    'starter theme must be granted on upgrade-path saves');
+  assert.ok(s.foundSecrets && typeof s.foundSecrets === 'object',
+    'loadSave must backfill foundSecrets onto old saves');
+  assert.ok(s.skinXp && typeof s.skinXp === 'object',
+    'loadSave must backfill skinXp onto old saves');
+});
+
+test('save schema: bestRound updates when beginRound is called with a higher number', () => {
+  const { sandbox } = buildSandbox();
+  const ctx = loadAllAsBrowser(sandbox);
+  vm_run(ctx, [
+    'startSurvival("medium");',   // beginRound(1) → bestRound becomes 1
+    'save.bestRound = 1;',         // reset for the test
+    'beginRound(7);',              // reach round 7
+  ].join('\n'));
+  assert.strictEqual(vm_eval(ctx, 'save.bestRound'), 7,
+    'beginRound(7) must bump save.bestRound to 7');
+  // Going BACKWARDS (round 3 after round 7) must NOT lower it
+  vm_run(ctx, 'beginRound(3);');
+  assert.strictEqual(vm_eval(ctx, 'save.bestRound'), 7,
+    'beginRound with a lower number must not lower save.bestRound');
+});
+
+test('save schema: prestige + skinXp round-trip through persist', () => {
+  const { sandbox } = buildSandbox();
+  const ctx = loadAllAsBrowser(sandbox);
+  vm_run(ctx, [
+    'save.prestige = 3;',
+    'save.skinXp = { default: 250, crimson: 80 };',
+    'save.foundSecrets = { cornerPixel: true };',
+    'save.hubBg = "solar";',
+    'save.hubBgs = { nebula: true, solar: true };',
+    'persist();',
+  ].join('\n'));
+  const stored = JSON.parse(vm_eval(ctx,
+    'localStorage.getItem("hypershards_save_v3")'));
+  assert.strictEqual(stored.prestige, 3);
+  assert.strictEqual(stored.skinXp.default, 250);
+  assert.strictEqual(stored.skinXp.crimson, 80);
+  assert.strictEqual(stored.foundSecrets.cornerPixel, true);
+  assert.strictEqual(stored.hubBg, 'solar');
+  assert.strictEqual(stored.hubBgs.solar, true);
 });

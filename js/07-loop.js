@@ -34,14 +34,35 @@ function achievement(name){
   if(state.achievements[name]) return;
   state.achievements[name] = true;
   safeLSSet('hypershards_achv', JSON.stringify(state.achievements));
+  // Look up the tiered reward — falls back to the legacy flat 50 ◈ if
+  // ALL_ACHIEVEMENTS isn't loaded yet (shouldn't happen, but defensive).
+  let reward = { shards: 50, xp: 25 };
+  if(typeof ALL_ACHIEVEMENTS !== 'undefined'){
+    const def = ALL_ACHIEVEMENTS.find(a => a.id === name);
+    if(def && def.reward) reward = def.reward;
+  }
+  save.credits += reward.shards;
+  if(typeof addSkinXp === 'function'){
+    addSkinXp(save.skin || 'default', reward.xp);
+  }
+  // Show banner with name + reward — players didn't see the +50 before
+  // because the banner only printed the achievement name.
   const el = document.getElementById('achievement');
   document.getElementById('achName').textContent = name;
+  const rewEl = document.getElementById('achReward');
+  if(rewEl) rewEl.textContent = '+' + reward.shards + ' ◈   +' + reward.xp + ' XP';
   el.style.opacity = 1;
   sfx('achieve');
-  save.credits += 50;
   persist();
+  // Also push a toast so the reward is visible even if the player is
+  // looking at the boss bar / minimap instead of the achievement banner.
+  if(typeof toast === 'function') toast('★ ' + name + '  ·  +' + reward.shards + ' ◈  ·  +' + reward.xp + ' XP');
+  // HUD shard count needs to refresh — the throttled HUD updater will
+  // catch it on its next tick, but updateHubInfo on hub return as well.
+  if(typeof syncCurrencyDisplays === 'function') syncCurrencyDisplays();
   clearTimeout(achievement._t);
-  achievement._t = setTimeout(()=>{ el.style.opacity = 0; }, 2500);
+  // Bumped from 2.5s → 4s so players have time to read the reward line.
+  achievement._t = setTimeout(()=>{ el.style.opacity = 0; }, 4000);
 }
 
 // --- Hit-stop ---
@@ -144,10 +165,20 @@ function loop(now){
         state.fx.rapid = Math.max(0, state.fx.rapid-dt);
         state.fx.dmg   = Math.max(0, state.fx.dmg-dt);
         state.fx.slow  = Math.max(0, state.fx.slow-dt);
+        const wasSuper = state.fx.super > 0;
+        state.fx.super = Math.max(0, state.fx.super-dt);
+        if(wasSuper && state.fx.super<=0 && typeof toast==='function') toast('SUPER · faded');
         if(typeof player !== 'undefined' && player && player.abilityCd > 0){
           player.abilityCd = Math.max(0, player.abilityCd - dt);
         }
+        // Ultimate (E) cooldown — separate from the per-skin Q ability.
+        // Reset to 0 in startSurvival / startBossFight so each new run
+        // starts with the ult ready (assuming the skin is mastered).
+        if(state.ultCd > 0){
+          state.ultCd = Math.max(0, state.ultCd - dt);
+        }
         comboTick(dt);
+        if(typeof tryLevelUp==='function') tryLevelUp();
       }
       maybeUpdateHud(dt);
     } else {

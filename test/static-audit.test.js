@@ -57,6 +57,9 @@ test('static audit: every <script src> in index.html exists on disk', () => {
   let m;
   while ((m = scriptRe.exec(html)) !== null) {
     const rel = m[1];
+    // Remote URLs (Three.js CDN, etc.) are intentionally not on disk —
+    // skip the existence check for anything that isn't a local path.
+    if (/^https?:\/\//.test(rel) || /^\/\//.test(rel)) continue;
     if (!fs.existsSync(path.join(ROOT, rel))) missing.push(rel);
   }
   assert.deepStrictEqual(missing, [],

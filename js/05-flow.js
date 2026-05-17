@@ -11,10 +11,12 @@ function startSurvival(diff){
     phase:'play', round:1, enemies:[], bullets:[], ebullets:[],
     particles:[], shards:[], powerups:[], boss:null, score:0,
     earnedThisRun:0, spawnTimer:0, spawnedThisRound:0, weaponIdx:0,
-    fx:{rapid:0,dmg:0,slow:0}, ai:null,
+    fx:{rapid:0,dmg:0,slow:0,super:0}, ai:null,
+    level:1, xpGoal:800,
     blackHole:null, beam:null, decoy:null, acidCloud:null,
     solarSun:null, drones:null, voidWells:null, hitStop:0,
     combo:{count:0,timer:0,mult:1,killTime:0},
+    ultCd:0,    // E-key ultimate cooldown; starts ready
     // Per-run stats — surfaced on the game-over screen so the player
     // sees more than a bare score after a long session.
     stats:{ kills:0, shotsFired:0, shotsHit:0, maxCombo:0, runStart:performance.now() },
@@ -29,6 +31,14 @@ function startSurvival(diff){
 }
 function beginRound(r){
   state.round = r;
+  // Track the highest round the player has ever REACHED. This drives
+  // the prestige gate (one of the three requirements) and the hub
+  // STATS modal. Was never written to before — save.bestRound stayed
+  // at the default 1 forever no matter how far you got.
+  if(r > (save.bestRound || 1)){
+    save.bestRound = r;
+    persist();
+  }
   state.spawnedThisRound = 0;
   state.spawnTimer = 60;
   state.travel = 0;
@@ -179,6 +189,20 @@ function renderShop(){
     for(const s of SKINS){
       const owned = save.skins[s.id];
       const equipped = save.skin===s.id;
+      // Per-skin mastery XP line — only shown for owned skins. Reaching
+      // the threshold unlocks the 3D-mode ULTIMATE (see ULTIMATES in
+      // 01-core.js) and recolours the ship gold. We render it gold-
+      // tinted once mastered so the shop reflects that achievement.
+      let xpLine = '';
+      if(owned && typeof getSkinXp === 'function' && typeof getSkinMasteryXp === 'function'){
+        const have = getSkinXp(s.id);
+        const need = getSkinMasteryXp(s.id);
+        if(have >= need){
+          xpLine = '<p style="color:#ffd700;font-weight:900;">★ MASTERED · XP ' + have + ' / ' + need + '</p>';
+        } else {
+          xpLine = '<p style="color:#9ec5ff;">XP ' + have + ' / ' + need + '</p>';
+        }
+      }
       const div = document.createElement('div');
       div.className='item skin';
       div.innerHTML = `
@@ -187,6 +211,7 @@ function renderShop(){
           <h3 style="color:${s.color}">${s.name}</h3>
           <p>${s.tagline||'Custom hull plating &amp; engine glow.'}</p>
           <p style="color:${s.color}">Glow: ${s.glow} · Accent: ${s.accent}${s.rainbow?' · ✦ Rainbow':''}${s.dark?' · ☾ Stealth':''}</p>
+          ${xpLine}
         </div>
         <div class="actions">
           <span class="price">${owned?(equipped?'EQUIPPED':'OWNED'):'◈ '+s.cost}</span>
@@ -235,6 +260,37 @@ function renderShop(){
         </div>`;
       grid.appendChild(div);
       drawIcon(div, 'special', sp.id);
+    }
+  } else if(shopTab==='theme'){
+    // Hub menu background customizer. Each theme costs ◈ shards (the
+    // default 'nebula' palette is granted free); buying records ownership
+    // in save.hubBgs and equipping persists the active id to save.hubBg,
+    // which drawHubScene() reads via getHubTheme(). Three button states
+    // mirror the skins tab: BUY (not owned), EQUIP (owned, not active),
+    // EQUIPPED (active, disabled).
+    const cur = save.hubBg || 'nebula';
+    const owned = save.hubBgs || { nebula:true };
+    for(const [id, th] of Object.entries(HUB_BG_THEMES)){
+      const isOwned = !!owned[id];
+      const equipped = (cur === id);
+      const grad = `linear-gradient(180deg, ${th.bg[0]}, ${th.bg[1]}, ${th.bg[2]})`;
+      const div = document.createElement('div');
+      div.className = 'item theme';
+      div.innerHTML = `
+        <div class="bgPreview" style="background:${grad}; box-shadow: inset 0 0 24px ${th.glowA}88, inset 0 0 60px ${th.nebs[0]}55;">
+          <span class="bgPreviewGlow" style="background:radial-gradient(ellipse at 30% 70%, ${th.nebs[0]}66, transparent 60%), radial-gradient(ellipse at 70% 30%, ${th.nebs[1]}55, transparent 65%);"></span>
+        </div>
+        <div class="info">
+          <h3 style="color:${th.glowA}">${th.label}</h3>
+          <p>Hub menu background palette &mdash; gradient, nebulas &amp; accent glow.</p>
+        </div>
+        <div class="actions">
+          <span class="price">${equipped?'EQUIPPED':(isOwned?'OWNED':'◈ '+th.cost)}</span>
+          <button class="btn buy small" ${equipped?'disabled':''} ${(!isOwned&&save.credits<th.cost)?'disabled':''} data-theme="${id}">
+            ${equipped?'EQUIPPED':(isOwned?'EQUIP':'BUY')}
+          </button>
+        </div>`;
+      grid.appendChild(div);
     }
   }
   grid.querySelectorAll('button[data-up]').forEach(b=>{
@@ -296,6 +352,24 @@ function renderShop(){
       if(save.credits<sp.cost) return;
       save.credits -= sp.cost; save.specials[id]=true;
       persist(); renderShop(); toast(sp.name+' acquired');
+    };
+  });
+  grid.querySelectorAll('button[data-theme]').forEach(b=>{
+    b.onclick = ()=>{
+      const id = b.getAttribute('data-theme');
+      const th = HUB_BG_THEMES[id];
+      if(!th) return;
+      if(!save.hubBgs) save.hubBgs = { nebula:true };
+      // Buy first if not owned (default 'nebula' is always pre-owned).
+      if(!save.hubBgs[id]){
+        if(save.credits<th.cost) return;
+        save.credits -= th.cost; save.hubBgs[id] = true;
+      }
+      // Equip immediately so the player sees the change next time the
+      // hub paints (already happens — drawHubScene reads getHubTheme()
+      // every frame).
+      save.hubBg = id;
+      persist(); renderShop(); toast('Equipped '+th.label);
     };
   });
 }

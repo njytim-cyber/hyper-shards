@@ -25,7 +25,13 @@ const state = {
   toClear: 0,
   shake: 0,
   weaponIdx: 0,
-  fx: { rapid:0, dmg:0, slow:0 },
+  fx: { rapid:0, dmg:0, slow:0, super:0 },
+  // Per-run XP/level. Score crossing `xpGoal` triggers levelUp(): showers
+  // gems, awards super-coins on every 3rd level, plays a celebratory sting.
+  // Starts at 1 each run (so every survival run feels rewarding regardless
+  // of save.best). Goal scales linearly: 800, 1600, 2400, …
+  level: 1,
+  xpGoal: 800,
   tut: null,
   ai: null,
   pvpYou: 0,
@@ -208,6 +214,13 @@ function showMenu(id, fade=false){
   document.getElementById('saveBar').classList.remove('hidden');
   document.getElementById('sbCredits').textContent = save.credits;
   document.getElementById('sbBest').textContent = save.best;
+  // Show ELITE difficulty button only when prestige unlocks it. Cheap
+  // re-check on every menu open keeps the gate honest if the player
+  // prestiges mid-session.
+  if(id === 'menuDiff'){
+    const elite = document.getElementById('btnDiffElite');
+    if(elite) elite.style.display = (typeof PRESTIGE_PERKS !== 'undefined' && PRESTIGE_PERKS.eliteUnlocked(save.prestige)) ? '' : 'none';
+  }
   if(window.__refreshTouchUI) window.__refreshTouchUI();
 }
 function hideOverlay(){
@@ -219,6 +232,14 @@ function showHUD(showPvp=false){
   document.getElementById('hud').style.display = showPvp ? 'none' : 'flex';
   document.getElementById('hudBottom').style.display = 'flex';
   document.getElementById('pvpScore').style.display = showPvp ? 'block' : 'none';
+  // Boss bar is normally toggled by spawn (04-enemies.js) and defeat
+  // (08-update.js) — but hideHUD/pause clear it without remembering
+  // there was a fight in progress, so resume() leaves it invisible.
+  // Re-mirror it from state.boss here so every HUD-restore path
+  // (resume, retry, mode switch) puts the bar back when applicable.
+  if(typeof state !== 'undefined' && state && state.boss){
+    document.getElementById('bossBar').style.display = 'block';
+  }
   if(window.__refreshTouchUI) window.__refreshTouchUI();
 }
 function hideHUD(){
