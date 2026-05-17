@@ -10,7 +10,7 @@
 //
 // Bumping CACHE_VERSION wipes stale shells on the next activate.
 
-const CACHE_VERSION = 'hs-shell-v18';
+const CACHE_VERSION = 'hs-shell-v19';
 const CACHE_AUDIO   = 'hs-audio-v1';
 
 // Files to pre-cache so the shell is fully offline-playable after first
