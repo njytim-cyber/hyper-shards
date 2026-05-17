@@ -5,29 +5,23 @@
 // WebSocket for that room, so the server has authoritative state with
 // no cross-DO coordination required.
 //
-// Routes:
-//   GET  /                        -> health check (text)
-//   GET  /rooms/:code             -> WebSocket upgrade into that room
-//   POST /rooms                   -> { code } — create a new room (host)
-//
 // Protocol (JSON over WS, both directions):
 //   c->s  {t:'hello', name, skin}
-//   c->s  {t:'input', ax, ay, fire, boost, aim}        // aim in radians
-//   c->s  {t:'start'}                                  // host only
+//   c->s  {t:'input', ax, ay, fire, boost, aim}
+//   c->s  {t:'start'}
+//   c->s  {t:'chat', msg}
 //   c->s  {t:'leave'}
 //   s->c  {t:'welcome', you, room, mode, target}
-//   s->c  {t:'lobby', players:[{id,name,skin,ready,host}]}
-//   s->c  {t:'state', tick, players:[...], bullets:[...], scores:{}}
-//   s->c  {t:'event', kind, ...}                        // 'kill','start','end'
+//   s->c  {t:'lobby', players, host}
+//   s->c  {t:'state', tick, players, bullets, scores, target, arenaW, arenaH}
+//   s->c  {t:'event', kind, ...}   // 'start', 'hit', 'kill', 'end'
+//   s->c  {t:'chat', from, name, msg, at}
 //   s->c  {t:'error', msg}
-//
-// Server tick = 20 Hz; client renders at native rAF. Position is
-// authoritative (no client prediction yet — kept simple for v1).
 
 const TICK_HZ = 20;
 const TICK_MS = 1000 / TICK_HZ;
 const ROOM_CODE_LEN = 4;
-const ROOM_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // skip I,O,0,1
+const ROOM_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const MAX_PLAYERS = 8;
 const KILLS_TO_WIN = 10;
 const ARENA_W = 1400;
@@ -86,14 +80,14 @@ export class GameRoom {
   constructor(state, env) {
     this.state = state;
     this.env = env;
-    this.code = null;          // set on first connect from URL
-    this.sockets = new Map();  // id -> WebSocket
-    this.players = new Map();  // id -> player object
+    this.code = null;
+    this.sockets = new Map();
+    this.players = new Map();
     this.bullets = [];
-    this.scores = {};          // id -> kills
+    this.scores = {};
     this.tick = 0;
     this.running = false;
-    this.host = null;          // id of the host (first to join)
+    this.host = null;
     this.target = KILLS_TO_WIN;
     this.timer = null;
     this.lastTickAt = 0;
@@ -161,8 +155,23 @@ export class GameRoom {
       this.startGame();
       return;
     }
+    if (msg.t === 'chat') {
+      const p = this.players.get(id);
+      if (!p) return;
+      const now = Date.now();
+      p.chatLog = (p.chatLog || []).filter((t) => now - t < 10000);
+      if (p.chatLog.length >= 6) return; // 6 msgs / 10s spam cap
+      p.chatLog.push(now);
+      // Strip ASCII control chars + DEL; everything printable allowed.
+      const ctrlRe = new RegExp('[\\x00-\\x1f\\x7f]', 'g');
+      const text = String(msg.msg || '').slice(0, 80).replace(ctrlRe, '');
+      if (!text) return;
+      this.broadcast({ t: 'chat', from: id, name: p.name, msg: text, at: now });
+      return;
+    }
     if (msg.t === 'leave') {
-      this.sockets.get(id)?.close(1000, 'left');
+      const sock = this.sockets.get(id);
+      if (sock) sock.close(1000, 'left');
       this.onClose(id);
     }
   }
@@ -188,10 +197,11 @@ export class GameRoom {
       vx: 0, vy: 0,
       hp: 5, maxHp: 5,
       facing: 0,
-      cd: 0,         // fire cooldown (ms)
+      cd: 0,
       respawn: 0,
       alive: true,
       in: { ax: 0, ay: 0, fire: false, boost: false },
+      chatLog: [],
     };
   }
 
@@ -225,7 +235,7 @@ export class GameRoom {
   doTick() {
     if (!this.running) return;
     const now = Date.now();
-    const dt = Math.min(80, now - this.lastTickAt); // clamp huge gaps
+    const dt = Math.min(80, now - this.lastTickAt);
     this.lastTickAt = now;
     this.tick++;
     this.simulate(dt);
@@ -238,7 +248,6 @@ export class GameRoom {
     const FIRE_CD = 240;
     const BULLET_SPD = 0.6;
     const BULLET_TTL = 1400;
-    // --- players ---
     for (const p of this.players.values()) {
       if (!p.alive) {
         p.respawn -= dt;
@@ -266,7 +275,6 @@ export class GameRoom {
         p.cd = FIRE_CD;
       }
     }
-    // --- bullets ---
     const live = [];
     for (const b of this.bullets) {
       b.ttl -= dt;
@@ -349,6 +357,7 @@ export class GameRoom {
       t: 'state', tick: this.tick,
       players, bullets, scores: this.scores,
       arenaW: ARENA_W, arenaH: ARENA_H,
+      target: this.target,
     });
   }
 

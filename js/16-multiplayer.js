@@ -48,6 +48,10 @@ const MP = {
   lobby: [],
   // UI-side last error
   err: '',
+  // Chat — keeps last N messages for in-game/lobby overlay.
+  chat: [],         // [{from, name, msg, at, you}]
+  chatMax: 30,
+  chatTyping: false,
 };
 
 function mpAvailable(){ return !!MP_WS_BASE; }
@@ -80,6 +84,7 @@ function mpConnect(code, name, skin){
   ws.addEventListener('message', (ev) => mpOnMessage(ev.data));
   ws.addEventListener('close', () => {
     MP.ws = null; MP.inLobby = false; MP.inGame = false;
+    if(typeof mpRemoveOverlay === 'function') mpRemoveOverlay();
     // If we were mid-game when the socket died, kick back to hub.
     if(state.phase === 'mp'){
       state.phase = 'menu';
@@ -145,14 +150,43 @@ function mpOnMessage(raw){
         MP.inLobby = true;
         state.phase = 'menu';
         if(typeof hideHUD === 'function') hideHUD();
+        mpRemoveOverlay();
         if(typeof openMpLobby === 'function') openMpLobby();
       }, 2000);
     }
+  } else if(m.t === 'chat'){
+    MP.chat.push({ from: m.from, name: m.name, msg: m.msg, at: m.at, you: m.from === MP.you });
+    if(MP.chat.length > MP.chatMax) MP.chat.splice(0, MP.chat.length - MP.chatMax);
+    mpRenderChatLog();
+    mpRefreshLobbyChatOnly();
   } else if(m.t === 'error'){
     MP.err = String(m.msg || 'server error');
     if(typeof toast === 'function') toast('MP: ' + MP.err);
     if(typeof mpRefreshLobbyUI === 'function') mpRefreshLobbyUI();
   }
+}
+
+function mpSendChat(text){
+  if(!MP.ws || MP.ws.readyState !== 1) return;
+  const trimmed = (text || '').trim().slice(0, 80);
+  if(!trimmed) return;
+  try { MP.ws.send(JSON.stringify({ t:'chat', msg: trimmed })); } catch {}
+}
+
+// Disconnect + return to hub. Called from ESC and the in-game LEAVE
+// button. Safe to call from any phase (no-op if not in MP).
+function mpLeaveMatch(){
+  mpDisconnect();
+  state.phase = 'menu';
+  if(typeof hideHUD === 'function') hideHUD();
+  if(typeof showMenu === 'function') showMenu('menuMain');
+  mpRemoveOverlay();
+  if(typeof toast === 'function') toast('Left the room');
+}
+
+function mpFocusChat(){
+  const el = document.getElementById('mpChatInput');
+  if(el){ MP.chatTyping = true; el.focus(); }
 }
 
 function mpNameOf(id){
@@ -163,8 +197,70 @@ function mpNameOf(id){
 function mpEnterPhase(){
   state.phase = 'mp';
   if(typeof hideOverlay === 'function') hideOverlay();
-  if(typeof showHUD === 'function') showHUD(true);
+  if(typeof hideHUD === 'function') hideHUD();
+  mpBuildOverlay();
   if(typeof toast === 'function') toast(`★ MATCH START — first to ${MP.target}`);
+}
+
+// ====== IN-GAME OVERLAY (LEAVE button + chat) ============
+// Pinned DOM on top of the canvas. Built on match start, removed on
+// leave. Chat input never steals movement keys because we keep
+// MP.chatTyping in sync with input focus and gate keys[] read in
+// mpUpdate when chatTyping is true.
+function mpBuildOverlay(){
+  mpRemoveOverlay();
+  const wrap = document.createElement('div');
+  wrap.id = 'mpOverlay';
+  wrap.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:9;font-family:inherit;';
+  wrap.innerHTML = `
+    <button id="mpLeaveBtnGame" style="pointer-events:auto;position:absolute;top:12px;right:12px;background:linear-gradient(180deg,#a02244,#5a0a22);border:2px solid #ff446688;color:#fff;font-weight:900;letter-spacing:2px;padding:8px 14px;border-radius:8px;cursor:pointer;font-family:inherit;font-size:12px;box-shadow:0 4px 0 #050a18,0 0 18px #ff446644;">◀ LEAVE</button>
+    <div id="mpChatBox" style="position:absolute;left:12px;bottom:12px;width:min(360px,40vw);pointer-events:auto;">
+      <div id="mpChatLog" style="max-height:160px;overflow-y:auto;background:#0a1430cc;border:1px solid #244a78;border-radius:6px;padding:6px 8px;font-size:12px;line-height:1.5;display:none;"></div>
+      <div style="display:flex;gap:6px;margin-top:6px;">
+        <input id="mpChatInput" type="text" maxlength="80" placeholder="Press T or Enter to chat" autocomplete="off" style="flex:1;background:#02030acc;color:#cfe9ff;border:1px solid #1f4d7a;border-radius:6px;padding:6px 10px;font-family:inherit;font-size:12px;outline:none;"/>
+        <button id="mpChatSend" style="background:linear-gradient(180deg,#1a5a9a,#0a2a4a);border:1px solid #3a8acc;color:#cfe9ff;font-weight:900;letter-spacing:2px;padding:6px 12px;border-radius:6px;cursor:pointer;font-family:inherit;font-size:11px;">SEND</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(wrap);
+  document.getElementById('mpLeaveBtnGame').onclick = () => mpLeaveMatch();
+  const input = document.getElementById('mpChatInput');
+  const send = document.getElementById('mpChatSend');
+  input.addEventListener('focus', () => { MP.chatTyping = true; });
+  input.addEventListener('blur',  () => { MP.chatTyping = false; });
+  input.addEventListener('keydown', (e) => {
+    e.stopPropagation(); // chat keys don't steer the ship
+    if(e.key === 'Enter'){
+      mpSendChat(input.value);
+      input.value = '';
+      input.blur();
+    } else if(e.key === 'Escape'){
+      input.value = '';
+      input.blur();
+    }
+  });
+  send.onclick = () => { mpSendChat(input.value); input.value = ''; input.blur(); };
+  mpRenderChatLog();
+}
+
+function mpRemoveOverlay(){
+  const el = document.getElementById('mpOverlay');
+  if(el) el.remove();
+}
+
+function mpRenderChatLog(){
+  const log = document.getElementById('mpChatLog');
+  if(!log) return;
+  if(!MP.chat.length){ log.style.display = 'none'; return; }
+  log.style.display = '';
+  log.innerHTML = MP.chat.slice(-20).map(c =>
+    `<div><span style="color:${c.you ? '#00ffaa' : '#ffea00'};font-weight:900;">${esc(c.name)}:</span> <span style="color:#cfe9ff;">${esc(c.msg)}</span></div>`
+  ).join('');
+  log.scrollTop = log.scrollHeight;
+}
+
+function esc(s){
+  return String(s).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 }
 
 // ====== PER-FRAME UPDATE ===================================
@@ -176,16 +272,21 @@ const MP_INPUT_HZ = 30;
 const MP_INPUT_MIN_MS = 1000 / MP_INPUT_HZ;
 function mpUpdate(dt){
   if(!MP.ws || MP.ws.readyState !== 1) return;
+  // Suspend ship input while the chat input has focus, so typing "asdw"
+  // in chat doesn't drift the ship across the arena.
   let ax = 0, ay = 0;
-  if(keys['a'] || keys['arrowleft'])  ax -= 1;
-  if(keys['d'] || keys['arrowright']) ax += 1;
-  if(keys['w'] || keys['arrowup'])    ay -= 1;
-  if(keys['s'] || keys['arrowdown'])  ay += 1;
-  if(typeof joy !== 'undefined' && joy && joy.active){
-    ax = joy.x; ay = joy.y;
+  const typing = MP.chatTyping;
+  if(!typing){
+    if(keys['a'] || keys['arrowleft'])  ax -= 1;
+    if(keys['d'] || keys['arrowright']) ax += 1;
+    if(keys['w'] || keys['arrowup'])    ay -= 1;
+    if(keys['s'] || keys['arrowdown'])  ay += 1;
+    if(typeof joy !== 'undefined' && joy && joy.active){
+      ax = joy.x; ay = joy.y;
+    }
   }
-  const fire = !!keys[' '] || (typeof joy !== 'undefined' && joy && joy.fire) || mpTouchFire;
-  const boost = !!keys['shift'];
+  const fire = !typing && (!!keys[' '] || (typeof joy !== 'undefined' && joy && joy.fire) || mpTouchFire);
+  const boost = !typing && !!keys['shift'];
   // Aim: face the cursor if we have one, else lock to facing-up.
   let aim = -Math.PI / 2;
   const me = MP.snap.players.find(p => p.id === MP.you);
@@ -326,15 +427,19 @@ function mpSkinFor(id){
 
 function mpRenderScoreboard(){
   if(!MP.snap.players.length) return;
-  // Sort highest-first
+  // Use the live target from the server snap if present (falls back to
+  // the welcome value). The earlier build never showed progress against
+  // the win target — players said "the counter doesn't work" because
+  // the kill column read "0" and stayed there with no context.
+  const target = MP.snap.target || MP.target || 10;
   const entries = MP.snap.players.map(p => ({
     p, k: MP.snap.scores[p.id] || 0,
   })).sort((a, b) => b.k - a.k);
-  const lineH = 18, pad = 10;
-  const w = 260, h = pad * 2 + entries.length * lineH + 22;
+  const lineH = 22, pad = 10;
+  const w = 320, h = pad * 2 + entries.length * lineH + 24;
   const x = W / 2 - w / 2, y = 12;
   ctx.save();
-  ctx.fillStyle = '#0a1430cc';
+  ctx.fillStyle = '#0a1430dd';
   ctx.strokeStyle = '#244a78';
   ctx.lineWidth = 1;
   ctx.fillRect(x, y, w, h);
@@ -342,16 +447,25 @@ function mpRenderScoreboard(){
   ctx.font = 'bold 11px monospace';
   ctx.fillStyle = '#9ec5ff';
   ctx.textAlign = 'left';
-  ctx.fillText(`ROOM ${MP.room}  ·  FIRST TO ${MP.target}`, x + pad, y + 14);
+  ctx.fillText(`ROOM ${MP.room}  ·  FIRST TO ${target} WINS`, x + pad, y + 14);
   let cy = y + 28;
   for(const { p, k } of entries){
     const me = p.id === MP.you;
+    // Progress bar under each name showing kills / target
+    const barX = x + pad, barW = w - pad * 2;
+    const barY = cy + 4;
+    ctx.fillStyle = '#02030a';
+    ctx.fillRect(barX, barY, barW, 14);
+    const frac = Math.min(1, k / target);
+    ctx.fillStyle = me ? '#00ffaa' : '#ffea00';
+    ctx.fillRect(barX, barY, barW * frac, 14);
     ctx.fillStyle = me ? '#00ffaa' : '#ffffff';
     ctx.textAlign = 'left';
-    ctx.fillText(p.name, x + pad, cy + 12);
+    ctx.font = 'bold 11px monospace';
+    ctx.fillText(p.name + (p.alive ? '' : '  ☠'), barX + 6, barY + 11);
     ctx.textAlign = 'right';
-    ctx.fillStyle = '#ffea00';
-    ctx.fillText(k + '', x + w - pad, cy + 12);
+    ctx.fillStyle = '#000';
+    ctx.fillText(k + ' / ' + target, barX + barW - 6, barY + 11);
     cy += lineH;
   }
   ctx.restore();
@@ -395,10 +509,18 @@ function openMpLobby(){
              style="background:#02030a;color:#ffea00;border:1px solid #1f4d7a;border-radius:6px;padding:8px 10px;font-family:inherit;letter-spacing:6px;width:120px;text-align:center;text-transform:uppercase;font-weight:900;"/>
     </div>
     <button class="modalBtn" id="mpJoin">⟶ JOIN ROOM</button>
-    <p style="color:#7ea8d4;font-size:11px;line-height:1.5;margin-top:18px;text-align:center;">
-      Cloud PvP deathmatch — first to <b>${MP.target}</b> kills wins.<br>
-      Co-op mode coming soon.
-    </p>
+    <div style="margin-top:14px;padding:10px;border:1px dashed #3a8acc55;border-radius:6px;background:#0a143055;">
+      <p style="color:#7ea8d4;font-size:11px;line-height:1.5;text-align:center;margin:0;">
+        <span style="color:#ffea00;font-weight:900;letter-spacing:2px;">PVP DEATHMATCH</span><br>
+        First to <b>${MP.target}</b> kills wins · 2–8 players · ESC to leave
+      </p>
+    </div>
+    <div style="margin-top:8px;padding:10px;border:1px dashed #44446655;border-radius:6px;background:#0a143033;opacity:0.6;">
+      <p style="color:#7ea8d4;font-size:11px;line-height:1.5;text-align:center;margin:0;">
+        <span style="color:#888;font-weight:900;letter-spacing:2px;">CO-OP MODE</span><br>
+        Coming soon — fight bosses together with friends
+      </p>
+    </div>
   `);
   document.getElementById('mpCreate').onclick = async () => {
     const name = document.getElementById('mpName').value.trim() || 'PILOT';
@@ -444,6 +566,16 @@ function mpRenderLobbyView(){
       : `<p style="color:#9ec5ff;text-align:center;letter-spacing:2px;">WAITING FOR HOST…</p>`}
     <button class="modalBtn" id="mpLeaveBtn">◀ LEAVE ROOM</button>
     ${MP.err ? `<p style="color:#ff6688;text-align:center;font-size:11px;margin-top:8px;">${MP.err}</p>` : ''}
+    <div style="margin-top:14px;border-top:1px solid #1f4d7a;padding-top:10px;">
+      <p style="color:#9ec5ff;font-size:11px;letter-spacing:2px;margin:0 0 6px;">CHAT</p>
+      <div id="mpLobbyChatLog" style="max-height:120px;overflow-y:auto;background:#02030a99;border:1px solid #1f4d7a;border-radius:6px;padding:6px 8px;font-size:12px;line-height:1.5;min-height:40px;">
+        ${MP.chat.length ? MP.chat.slice(-12).map(c => `<div><span style="color:${c.you ? '#00ffaa' : '#ffea00'};font-weight:900;">${esc(c.name)}:</span> <span style="color:#cfe9ff;">${esc(c.msg)}</span></div>`).join('') : '<span style="color:#666;">say hi to your friends…</span>'}
+      </div>
+      <div style="display:flex;gap:6px;margin-top:6px;">
+        <input id="mpLobbyChatInput" type="text" maxlength="80" placeholder="Message…" autocomplete="off" style="flex:1;background:#02030acc;color:#cfe9ff;border:1px solid #1f4d7a;border-radius:6px;padding:6px 10px;font-family:inherit;font-size:12px;outline:none;"/>
+        <button id="mpLobbyChatSend" style="background:linear-gradient(180deg,#1a5a9a,#0a2a4a);border:1px solid #3a8acc;color:#cfe9ff;font-weight:900;letter-spacing:2px;padding:6px 12px;border-radius:6px;cursor:pointer;font-family:inherit;font-size:11px;">SEND</button>
+      </div>
+    </div>
   `);
   if(isHost){
     const btn = document.getElementById('mpStartBtn');
@@ -453,6 +585,17 @@ function mpRenderLobbyView(){
     mpDisconnect();
     if(typeof closeHubModal === 'function') closeHubModal();
   };
+  const lobInput = document.getElementById('mpLobbyChatInput');
+  const lobSend  = document.getElementById('mpLobbyChatSend');
+  if(lobInput){
+    lobInput.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if(e.key === 'Enter'){ mpSendChat(lobInput.value); lobInput.value = ''; }
+    });
+  }
+  if(lobSend) lobSend.onclick = () => { mpSendChat(lobInput.value); lobInput.value = ''; };
+  const log = document.getElementById('mpLobbyChatLog');
+  if(log) log.scrollTop = log.scrollHeight;
 }
 
 // Called by mpOnMessage when the lobby roster changes — re-renders the
@@ -461,4 +604,16 @@ function mpRefreshLobbyUI(){
   if(MP.inLobby && document.getElementById('mpLobbyList')){
     mpRenderLobbyView();
   }
+}
+
+// Lighter refresh — only re-paints the chat log inside an open lobby
+// modal. Used on chat-message arrival so the input field doesn't lose
+// focus mid-typing (a full re-render would steal it).
+function mpRefreshLobbyChatOnly(){
+  const log = document.getElementById('mpLobbyChatLog');
+  if(!log) return;
+  log.innerHTML = MP.chat.slice(-12).map(c =>
+    `<div><span style="color:${c.you ? '#00ffaa' : '#ffea00'};font-weight:900;">${esc(c.name)}:</span> <span style="color:#cfe9ff;">${esc(c.msg)}</span></div>`
+  ).join('');
+  log.scrollTop = log.scrollHeight;
 }

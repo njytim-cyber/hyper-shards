@@ -11,7 +11,7 @@
 // so deploys evict stale shells). The static-audit test
 // `version: VERSION constant is in sync across package.json / 01-core.js / sw.js`
 // will fail loudly if any of the three drift.
-const VERSION = '1.4.2';
+const VERSION = '1.4.3';
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 let W = window.innerWidth, H = window.innerHeight;
@@ -517,7 +517,7 @@ addEventListener('keydown', e => {
   // Only register movement/fire/boost keys when the game is actually
   // running. Menu interactions (Enter to confirm, etc.) used to leak
   // their keydown into the play phase and wedge the ship.
-  const playing = state && (state.phase==='play' || state.phase==='pvp' || state.phase==='tutorial');
+  const playing = state && (state.phase==='play' || state.phase==='pvp' || state.phase==='tutorial' || state.phase==='mp');
   if(playing) keys[k] = true;
   if(state.phase==='play'){
     if(k==='c') cycleWeapon();
@@ -534,6 +534,10 @@ addEventListener('keydown', e => {
   } else if(state.phase==='tutorial'){
     if(k==='c') cycleWeapon();
     if(k==='enter' || k===' ') tutAdvance();
+  } else if(state.phase==='mp'){
+    // T or Enter focuses chat input; ESC leaves the room.
+    if(k==='t' || k==='enter'){ if(typeof mpFocusChat==='function') mpFocusChat(); e.preventDefault(); }
+    if(k==='escape'){ if(typeof mpLeaveMatch==='function') mpLeaveMatch(); }
   }
 });
 addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
