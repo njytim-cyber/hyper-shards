@@ -497,6 +497,7 @@ function openModesModal(){
       <button class="navBtn pvpClr"   data-mode="pvp"><div class="ring"><canvas data-navicon="pvp"  width="72" height="72"></canvas></div><div class="lbl">VS AI</div><div class="ribbon">NEW</div></button>
       <button class="navBtn tutClr"   data-mode="tut"><div class="ring"><canvas data-navicon="tut"  width="72" height="72"></canvas></div><div class="lbl">LEARN</div></button>
       <button class="navBtn shipsClr" data-mode="3d"><div class="ring"><canvas data-navicon="ships" width="72" height="72"></canvas></div><div class="lbl">3D</div><div class="ribbon">BETA</div></button>
+      <button class="navBtn pvpClr"   data-mode="mp" style="grid-column:1/3;"><div class="ring"><canvas data-navicon="pvp" width="72" height="72"></canvas></div><div class="lbl">MULTIPLAYER</div><div class="ribbon">BETA</div></button>
     </div>
   `);
   paintHubNavIcons();   // re-paints every data-navicon canvas, including the ones we just inserted
@@ -508,6 +509,7 @@ function openModesModal(){
       else if(m === 'pvp')  showMenu('menuPvp');
       else if(m === 'tut')  showMenu('menuTut');
       else if(m === '3d' && typeof start3DMode === 'function') start3DMode();
+      else if(m === 'mp' && typeof openMpLobby === 'function') openMpLobby();
     };
   });
 }

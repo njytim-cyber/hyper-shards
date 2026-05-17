@@ -112,7 +112,7 @@ state._tutPollDisabled = false;
 
 // ============================================================
 let lastT = performance.now();
-const ACTIVE_PHASES = new Set(['play','tutorial','pvp','dead']);
+const ACTIVE_PHASES = new Set(['play','tutorial','pvp','dead','mp']);
 let _loopErrorCount = 0;
 // Fixed-timestep physics. Position updates throughout the codebase use raw
 // per-frame velocity (`x += vx`), so a phone running at 30fps used to advance
@@ -139,7 +139,7 @@ function loop(now){
     }
     const slowMul = state.fx.slow>0 ? 0.4 : 1;
     const playing = state.phase==='play' || state.phase==='tutorial';
-    if(playing || state.phase==='pvp'){
+    if(playing || state.phase==='pvp' || state.phase==='mp'){
       // Accumulate real time. slowMul applies on play (slow-time effect)
       // by feeding the accumulator a fraction of real-time, so the world
       // advances slower while wall-clock cooldowns/HUD still tick at 1×.
@@ -148,7 +148,8 @@ function loop(now){
       let steps = 0;
       while(_physicsAcc >= FIXED_STEP && steps < MAX_SUBSTEPS){
         if(playing) update(FIXED_STEP);
-        else updatePvp(FIXED_STEP);
+        else if(state.phase==='pvp') updatePvp(FIXED_STEP);
+        else if(state.phase==='mp' && typeof mpUpdate === 'function') mpUpdate(FIXED_STEP);
         _physicsAcc -= FIXED_STEP;
         steps++;
       }
@@ -189,7 +190,8 @@ function loop(now){
     // Only paint the in-game canvas when the player can actually see it.
     // In menus the overlay covers the canvas; drawing nebula/streaks/etc.
     // into a hidden layer is the single biggest mobile/tablet perf leak.
-    if(ACTIVE_PHASES.has(state.phase)) render();
+    if(state.phase==='mp' && typeof mpRender === 'function') mpRender();
+    else if(ACTIVE_PHASES.has(state.phase)) render();
   } catch (err) {
     if (_loopErrorCount < 3) {
       console.error('Game loop error (continuing):', err);

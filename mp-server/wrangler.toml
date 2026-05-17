@@ -1,0 +1,21 @@
+name = "hyper-shards-mp"
+main = "src/index.js"
+compatibility_date = "2024-11-01"
+
+# Durable Objects host the per-room authoritative state. One DO instance
+# per active room — Cloudflare handles routing all WebSockets for a given
+# room code to the same DO. Free plan supports DOs as of 2024 with limits.
+[[durable_objects.bindings]]
+name = "ROOM"
+class_name = "GameRoom"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["GameRoom"]
+
+# CORS — the deployed Pages site needs to talk to this Worker over WS.
+# Set ALLOWED_ORIGIN to your Pages origin after deploying, e.g.
+# "https://hyper-shards.pages.dev". The "*" default is safe for the WS
+# handshake but tighten before production traffic.
+[vars]
+ALLOWED_ORIGIN = "*"

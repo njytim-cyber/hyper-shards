@@ -24,6 +24,27 @@ Until the binding exists the API returns empty results / 503 — the
 client (`fetchTopScores`, `submitScore` in `01-core.js`) silently
 degrades, so play continues normally without a leaderboard.
 
+## Multiplayer (one-time setup)
+
+Cloud PvP deathmatch lives in [mp-server/](mp-server/) (separate
+Cloudflare Worker + Durable Object, not a Pages Function). To activate:
+
+```sh
+cd mp-server
+wrangler deploy            # prints the Worker URL
+```
+
+Then paste that URL into `MP_WS_BASE` at the top of
+[js/16-multiplayer.js](js/16-multiplayer.js). Until that's set, the
+hub's MULTIPLAYER button opens a modal explaining "SERVER NOT CONFIGURED"
+and never attempts a connection — so single-player keeps working
+identically whether or not the Worker is deployed.
+
+Mode coverage: **PvP deathmatch** is fully implemented (first to 10
+kills wins, 2–8 players per room). **Co-op** is intentionally TODO and
+needs design input (friendly fire? shared XP? boss tiers scaling with
+party size?) before being built.
+
 ## Stack
 
 **Pure JavaScript. No TypeScript, no bundler, no build step.**

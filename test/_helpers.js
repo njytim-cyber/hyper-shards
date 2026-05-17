@@ -135,7 +135,8 @@ function buildSandbox() {
 const FILES = [
   '01-core.js','02-input.js','03-actors.js','04-enemies.js','05-flow.js',
   '06-audio.js','07-loop.js','08-update.js','09-boss-ai.js','10-modes.js',
-  '11-render.js','12-icons.js','13-hub.js','14-boss-arena.js','15-3d-mode.js'
+  '11-render.js','12-icons.js','13-hub.js','14-boss-arena.js','15-3d-mode.js',
+  '16-multiplayer.js'
 ];
 
 function loadAllAsBrowser(sandbox) {

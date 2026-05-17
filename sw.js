@@ -14,7 +14,7 @@
 // VERSION constant in js/01-core.js. Bump per release and the SW
 // cache name updates automatically, so we stop hand-incrementing
 // the old v1/v2/.../v19 counter.
-const VERSION = '1.3.4';
+const VERSION = '1.4.0';
 const CACHE_VERSION = 'hs-shell-v' + VERSION;
 const CACHE_AUDIO   = 'hs-audio-v1';
 
@@ -43,6 +43,7 @@ const SHELL = [
   './js/13-hub.js',
   './js/14-boss-arena.js',
   './js/15-3d-mode.js',
+  './js/16-multiplayer.js',
 ];
 
 self.addEventListener('install', (event) => {

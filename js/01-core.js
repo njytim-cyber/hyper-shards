@@ -11,7 +11,7 @@
 // so deploys evict stale shells). The static-audit test
 // `version: VERSION constant is in sync across package.json / 01-core.js / sw.js`
 // will fail loudly if any of the three drift.
-const VERSION = '1.3.4';
+const VERSION = '1.4.0';
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 let W = window.innerWidth, H = window.innerHeight;
