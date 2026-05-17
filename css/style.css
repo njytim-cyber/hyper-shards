@@ -634,6 +634,41 @@
   .sideBtn:hover::after{ animation-duration:2s; opacity:1; }
   .sideBtn:active{transform:translateY(-1px) scale(.96); box-shadow:0 2px 0 #050a18, 0 3px 8px #00000099;}
 
+  /* === Naked-icon override for side buttons ================================
+     Same treatment as the bottom-nav buttons: strip the circular ring
+     chrome (background / border / box-shadow / aura halo / orbit dashes)
+     so each side button reads as a free-standing icon with a strong
+     per-theme glow. The icon glyph itself stays — only the backdrop
+     and its decorations come off. */
+  .sideBtn{
+    background: none !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    animation: none !important;
+    overflow: visible !important;
+    /* Glyph: bigger + strong per-theme glow so the icon stands alone */
+    font-size: 42px !important;
+    color: #ffffff !important;
+    text-shadow:
+      0 3px 0 #050a18,
+      0 0 12px var(--c1, #ffea00),
+      0 0 5px  var(--c1, #ffea00) !important;
+  }
+  .sideBtn::before, .sideBtn::after{ display: none !important; }
+  .sideBtn:hover{
+    box-shadow: none !important;
+    filter: brightness(1.18) saturate(1.25) !important;
+    text-shadow:
+      0 4px 0 #050a18,
+      0 0 20px var(--c1, #ffea00),
+      0 0 8px  #ffffff !important;
+  }
+  .sideBtn:active{
+    box-shadow: none !important;
+    transform: translateY(-1px) scale(.96);
+  }
+
   /* theme colors per button id */
   #hubBtnSettings  { --c1:#3aa0ff; animation-delay:.0s; }
   #hubBtnAchv      { --c1:#ffaa00; animation-delay:.3s; }
