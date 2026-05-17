@@ -727,7 +727,10 @@
   #hubHero .pedestal{position:absolute; left:50%; bottom:-10px; width:240px; height:50px; transform:translateX(-50%); background:radial-gradient(ellipse at center, #00eaff66 0%, #ff00cc33 40%, transparent 70%); pointer-events:none; animation:pedestalPulse 3s ease-in-out infinite;}
   @keyframes pedestalPulse{0%,100%{opacity:.7; transform:translateX(-50%) scale(1)} 50%{opacity:1; transform:translateX(-50%) scale(1.15)}}
 
-  /* Pulsing energy ring around hero */
+  /* Pulsing energy ring around hero. Disabled by the CLEANER HUB
+     override below — they crowded the title + subtitle. Kept the
+     rules defined for backwards compat in case anything else
+     references them. */
   #hubHero::before{
     content:""; position:absolute; left:50%; top:50%; width:420px; height:420px;
     transform:translate(-50%,-50%); border-radius:50%;
@@ -743,6 +746,28 @@
     pointer-events:none; box-shadow:0 0 50px #ff00cc55, inset 0 0 50px #00eaff44;
   }
   @keyframes ringSpin{0%{transform:translate(-50%,-50%) rotate(0)} 100%{transform:translate(-50%,-50%) rotate(360deg)}}
+
+  /* === CLEANER HUB ========================================================
+     Five fixes for the cluttered hub:
+       1. Title forced to ONE line (was wrapping "HYPER" / "SHARDS"
+          on narrow viewports because letter-spacing:14px made it wide)
+       2. Hero ship dialled down to 240px (was 320px — dominated screen)
+       3. Dashed orbit + magenta ring around the hero hidden (they were
+          covering the subtitle and adding visual noise without function)
+       4. Daily-mission "VOID INCURSION" banner narrowed + topped
+          slightly so it doesn't overlap the top-right shardBar
+       5. Hero pedestal glow toned down so the subtitle sits clear of it
+  */
+  .hubTitleText{
+    white-space: nowrap;
+    font-size: 48px;
+    letter-spacing: 10px;
+  }
+  .hubTitleSub{ position: relative; z-index: 5; }
+  #hubHero canvas{ width: 240px !important; height: 240px !important; }
+  #hubHero::before, #hubHero::after{ display: none; }
+  #hubHero .pedestal{ width: 180px; height: 36px; opacity: .55; }
+  .eventRibbon{ max-width: 360px; padding: 5px 22px 8px; }
 
   /* Nav row — anchored to bottom with safe margin (BTD6-style) */
   #hubBottom{position:absolute; left:0; right:0; bottom:30px; padding:0 12px; display:flex; justify-content:center; align-items:flex-end; gap:22px; z-index:3; pointer-events:none;}
