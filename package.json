@@ -1,7 +1,7 @@
 {
   "name": "hyper-shards",
   "private": true,
-  "version": "1.4.1",
+  "version": "1.4.2",
   "description": "Neon arcade space shooter — pure JS, no build step. See CLAUDE.md.",
   "scripts": {
     "test": "node --test test/*.test.js",

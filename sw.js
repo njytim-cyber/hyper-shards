@@ -14,7 +14,7 @@
 // VERSION constant in js/01-core.js. Bump per release and the SW
 // cache name updates automatically, so we stop hand-incrementing
 // the old v1/v2/.../v19 counter.
-const VERSION = '1.4.1';
+const VERSION = '1.4.2';
 const CACHE_VERSION = 'hs-shell-v' + VERSION;
 const CACHE_AUDIO   = 'hs-audio-v1';
 

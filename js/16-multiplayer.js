@@ -22,7 +22,7 @@
 // mp-server/README.md). Until then MP_WS_BASE is empty, the hub button
 // shows "(server offline)", and no connection is ever attempted — so
 // shipping this file does not break single-player.
-const MP_WS_BASE = '';  // e.g. 'https://hyper-shards-mp.you.workers.dev'
+const MP_WS_BASE = 'https://hyper-shards-mp.njytim.workers.dev';
 
 // ====== STATE ==============================================
 const MP = {
