@@ -8,3 +8,10 @@ audio/original/
 test-results/
 playwright-report/
 test/_screenshots/
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+.env*
+!.env.example

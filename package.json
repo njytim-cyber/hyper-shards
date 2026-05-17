@@ -9,9 +9,12 @@
     "e2e": "playwright test",
     "e2e:tablet": "playwright test --project=tablet",
     "e2e:phone": "playwright test --project=phone",
-    "e2e:desktop": "playwright test --project=desktop"
+    "e2e:desktop": "playwright test --project=desktop",
+    "deploy": "wrangler deploy",
+    "preview": "wrangler dev"
   },
   "devDependencies": {
-    "@playwright/test": "^1.59.1"
+    "@playwright/test": "^1.59.1",
+    "wrangler": "^4.92.0"
   }
 }
