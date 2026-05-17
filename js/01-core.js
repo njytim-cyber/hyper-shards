@@ -1,4 +1,17 @@
 'use strict';
+// ============================================================
+// VERSION  (semver — MAJOR.MINOR.PATCH)
+// ============================================================
+// Single source of truth for the build's version string. Bump per
+// release using semver: PATCH for bugfixes, MINOR for new features,
+// MAJOR for save-incompatible / breaking changes.
+//
+// IMPORTANT: must be kept in sync with `version` in package.json AND
+// the VERSION constant in sw.js (which derives the cache name from it
+// so deploys evict stale shells). The static-audit test
+// `version: VERSION constant is in sync across package.json / 01-core.js / sw.js`
+// will fail loudly if any of the three drift.
+const VERSION = '1.0.0';
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 let W = window.innerWidth, H = window.innerHeight;

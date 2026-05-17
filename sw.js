@@ -10,7 +10,12 @@
 //
 // Bumping CACHE_VERSION wipes stale shells on the next activate.
 
-const CACHE_VERSION = 'hs-shell-v19';
+// VERSION — semver. MUST match `version` in package.json and the
+// VERSION constant in js/01-core.js. Bump per release and the SW
+// cache name updates automatically, so we stop hand-incrementing
+// the old v1/v2/.../v19 counter.
+const VERSION = '1.0.0';
+const CACHE_VERSION = 'hs-shell-v' + VERSION;
 const CACHE_AUDIO   = 'hs-audio-v1';
 
 // Files to pre-cache so the shell is fully offline-playable after first

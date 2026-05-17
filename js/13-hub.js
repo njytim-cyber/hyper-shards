@@ -626,6 +626,10 @@ document.getElementById('hubBtnSettings').onclick = ()=>{
       <span class="label">ACHIEVEMENTS</span>
       <span class="val">${Object.keys(state.achievements||{}).length} / ${ALL_ACHIEVEMENTS.length}</span>
     </div>
+    <div class="row">
+      <span class="label">VERSION</span>
+      <span class="val" style="font-family:ui-monospace,monospace;color:#9ec5ff;">v${typeof VERSION!=='undefined'?VERSION:'?'}</span>
+    </div>
     <button class="modalBtn primary" id="optSave">SAVE</button>
     <button class="modalBtn" id="optReset">↺ WIPE SAVE DATA</button>
     <button class="modalBtn" id="optForceReload" style="background:linear-gradient(180deg,#3aa0ff,#1a4477);">⟲ FORCE RELOAD (clear cache)</button>
